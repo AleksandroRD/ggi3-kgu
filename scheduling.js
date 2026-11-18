@@ -27,6 +27,7 @@ document.getElementById('next').onclick = () => go(cur + 1);
 window.addEventListener('hashchange', () => { const k = names.indexOf(location.hash.slice(1)); if (k >= 0) go(k); });
 window.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'Escape' && window.parent !== window) { window.parent.postMessage('close-book', '*'); return; }
   if (e.key === 'ArrowRight' || e.key === 'PageDown') go(cur + 1);
   else if (e.key === 'ArrowLeft' || e.key === 'PageUp') go(cur - 1);
   else if (e.key === ' ' && sims[names[cur]]) { e.preventDefault(); sims[names[cur]].togglePause(); }
