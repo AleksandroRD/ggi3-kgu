@@ -20,13 +20,19 @@ function go(i){
   document.getElementById('next').disabled = i === slides.length - 1;
   document.getElementById('counter').textContent = (i + 1) + ' / ' + slides.length;
   if (location.hash.slice(1) !== names[i]) { try { location.hash = names[i]; } catch(e){} }
+  if (window.parent !== window) window.parent.postMessage({ type: 'slide', name: names[i] }, '*');   // tell the library menu
   requestAnimationFrame(resizeAll);
 }
+// the library menu can ask the miniature on the book's page to show a given slide
+window.addEventListener('message', e => {
+  if (e.data && e.data.type === 'goto') { const k = names.indexOf(e.data.name); if (k >= 0) go(k); }
+});
 document.getElementById('prev').onclick = () => go(cur - 1);
 document.getElementById('next').onclick = () => go(cur + 1);
 window.addEventListener('hashchange', () => { const k = names.indexOf(location.hash.slice(1)); if (k >= 0) go(k); });
 window.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'Escape' && window.parent !== window) { window.parent.postMessage('close-book', '*'); return; }
   if (e.key === 'ArrowRight' || e.key === 'PageDown') go(cur + 1);
   else if (e.key === 'ArrowLeft' || e.key === 'PageUp') go(cur - 1);
   else if (e.key === ' ' && sims[names[cur]]) { e.preventDefault(); sims[names[cur]].togglePause(); }

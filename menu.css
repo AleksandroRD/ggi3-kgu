@@ -1,0 +1,122 @@
+:root{
+  --wall:#f3ede2; --wood:#8a5a2e; --wood-dark:#6b4220; --wood-light:#a8743f;
+  --back:#c4a479; --text:#1a2233; --muted:#55627c; --accent:#d98200;
+  --sans:'Space Grotesk', system-ui, sans-serif;
+  --mono:'JetBrains Mono', ui-monospace, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:var(--sans);color:var(--text)}
+body{
+  min-height:100vh;padding:0 20px 60px;
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(217,130,0,.10), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(15,157,143,.08), transparent 60%),
+    var(--wall);
+}
+body.open{overflow:hidden}
+
+.menu-head{text-align:center;padding:40px 0 28px}
+.menu-head h1{margin:0;font-size:clamp(32px,4.4vw,52px);letter-spacing:-.02em}
+.menu-head p{margin:8px 0 0;color:var(--muted);font-family:var(--mono);font-size:14px}
+
+/* ---------- bookcase ---------- */
+.case{
+  max-width:980px;margin:0 auto;
+  border:16px solid var(--wood);border-radius:8px;
+  background:var(--back);
+  box-shadow:0 30px 50px -20px rgba(60,35,10,.45), inset 0 0 40px rgba(60,35,10,.35);
+}
+.row{
+  position:relative;display:flex;align-items:flex-end;gap:7px;
+  height:290px;padding:0 28px;
+  border-bottom:18px solid var(--wood-light);
+  box-shadow:inset 0 -10px 14px -8px rgba(40,22,5,.45);
+}
+.row:last-child{border-bottom:0;box-shadow:none}
+
+/* ---------- a book standing on the shelf (spine view) ---------- */
+.book{
+  position:relative;flex:none;padding:0;border:0;cursor:pointer;
+  width:var(--t);height:var(--h);background:none;
+  transition:transform .2s ease;
+}
+.book:hover,.book:focus-visible{transform:translateY(-10px)}
+.book:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.book .spine{position:absolute;inset:0}
+
+/* the spine look is shared by shelf books and the 3D overlay */
+.spine{
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+  background:var(--c);border-radius:3px 3px 1px 1px;color:#fff;
+  box-shadow:inset 3px 0 0 rgba(255,255,255,.2), inset -5px 0 8px rgba(0,0,0,.28);
+}
+.spine::before,.spine::after{
+  content:"";position:absolute;left:0;right:0;height:5px;background:rgba(255,255,255,.55);
+}
+.spine::before{top:16px;box-shadow:0 8px 0 rgba(255,255,255,.3)}
+.spine::after{bottom:16px;box-shadow:0 -8px 0 rgba(255,255,255,.3)}
+.spine span{
+  writing-mode:vertical-rl;transform:rotate(180deg);
+  font-weight:600;font-size:15px;letter-spacing:.04em;white-space:nowrap;
+  max-height:calc(100% - 80px);overflow:hidden;text-overflow:ellipsis;
+}
+
+/* ---------- 3D overlay ---------- */
+#stage{position:fixed;inset:0;z-index:20;perspective:1800px;pointer-events:none;visibility:hidden}
+#stage.on{visibility:visible;pointer-events:auto}
+#stage .backdrop{position:absolute;inset:0;background:rgba(20,14,6,.55);opacity:0}
+#stage .box{position:absolute;left:0;top:0;transform-style:preserve-3d;will-change:transform}
+.box > *{position:absolute;top:0;left:0}
+.box .spine{transform-origin:left center;transform:rotateY(-90deg);border-radius:0}
+.box .cover-front,.box .cover-back{border-radius:0}  /* rounded corners let the white page peek through */
+.box .page{
+  width:100%;height:100%;background:#fff;overflow:hidden;
+  box-shadow:inset 8px 0 14px -8px rgba(0,0,0,.25);
+}
+.box .page{background:#fffdf8}
+.box .thumb{position:absolute;overflow:hidden;background:#fff;
+  box-shadow:0 0 0 .5px rgba(0,0,0,.18), 0 1px 3px rgba(0,0,0,.12)}
+.box .thumb iframe{position:absolute;top:0;left:0;border:0;transform-origin:0 0;pointer-events:none;background:#fff}
+.box .backcover{width:100%;height:100%;background:var(--c);filter:brightness(.7)}
+.box .cover{width:100%;height:100%;transform-origin:left center;transform-style:preserve-3d}
+.box .cover > div{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.cover-front{
+  background:linear-gradient(135deg, rgba(255,255,255,.14), transparent 40%), var(--c);
+  color:#fff;display:flex;flex-direction:column;justify-content:space-between;
+  padding:9% 10%;border-radius:2px 6px 6px 2px;
+  box-shadow:inset 6px 0 0 rgba(0,0,0,.18), inset -2px 0 0 rgba(255,255,255,.2);
+}
+.cover-front .chip{width:12%;aspect-ratio:1;border:max(2px,.9%) solid #fff;border-radius:22%;position:relative}
+.cover-front .chip::after{content:"";position:absolute;inset:22%;background:#fff;border-radius:18%}
+.cover-front h2{margin:0;font-size:clamp(14px,2.2vw,30px);line-height:1.08;letter-spacing:-.01em;font-size:calc(var(--W) * .11)}
+.cover-front p{margin:.6em 0 0;font-family:var(--mono);opacity:.85;font-size:calc(var(--W) * .042)}
+.cover-back{background:#fffdf8;transform:rotateY(180deg);box-shadow:inset -8px 0 14px -8px rgba(0,0,0,.25);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 12%;color:var(--text)}
+.cover-back h3{margin:0;font-size:calc(var(--W) * .085);line-height:1.1;letter-spacing:-.01em}
+.cover-back p{margin:.7em 0 0;font-family:var(--mono);color:var(--muted);font-size:calc(var(--W) * .036)}
+.cover-back::after{content:"";width:22%;height:2px;background:var(--c);margin-top:1.2em;order:-1;margin:0 0 1.2em}
+
+/* ---------- presentation viewer ---------- */
+#viewer{
+  position:fixed;inset:0;z-index:30;background:#fff;
+  opacity:0;visibility:hidden;transition:opacity .35s ease, visibility .35s;
+}
+#viewer.show{opacity:1;visibility:visible}
+#viewer iframe{border:0;width:100%;height:100%;display:block}
+#back{
+  position:absolute;left:14px;bottom:14px;padding:8px 14px;
+  font:600 13px var(--sans);color:var(--text);cursor:pointer;
+  background:rgba(255,255,255,.92);border:1px solid #d0d0cc;border-radius:999px;
+  box-shadow:0 2px 8px rgba(0,0,0,.12);
+}
+#back:hover{border-color:var(--accent);color:var(--accent)}
+
+@media (max-width:640px){
+  body{padding:0 8px 40px}
+  .case{border-width:10px}
+  .row{height:270px;padding:0 12px;gap:5px}
+}
+@media (prefers-reduced-motion:reduce){
+  .book{transition:none}
+  #viewer{transition:none}
+}
