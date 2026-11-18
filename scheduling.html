@@ -36,7 +36,6 @@
   main{flex:1;position:relative;overflow:hidden}
   .slide{position:absolute;inset:0;padding:30px 44px 24px;overflow:auto;opacity:0;visibility:hidden;transform:translateX(24px);transition:opacity .35s ease, transform .35s ease, visibility .35s}
   .slide.active{opacity:1;visibility:visible;transform:none}
-  .kicker{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
   h1{font-size:clamp(34px,4.6vw,60px);line-height:1.02;margin:0 0 18px;letter-spacing:-.02em}
   h2{font-size:clamp(26px,3vw,38px);margin:0 0 8px;letter-spacing:-.015em}
   .lead{font-size:clamp(16px,1.35vw,20px);line-height:1.55;color:#34405a;max-width:60ch}
@@ -100,6 +99,37 @@
   .metric code{display:inline-block;margin-top:6px;font-family:var(--mono);font-size:12px;color:var(--teal);background:rgba(15,157,143,.08);padding:3px 7px;border-radius:6px}
   .metric.cs{border-color:rgba(217,130,0,.45)}
   .metric.cs h4{color:var(--accent)}
+
+  /* slide FCFS overview */
+  .sx{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+  .sx .card{padding:16px 18px}
+  .sx h4{margin:0 0 8px;font-size:15px}
+  .sx ul{margin:0;padding-left:18px;line-height:1.55;color:#34405a;font-size:14.5px}
+  .sx li{margin:3px 0}
+  .pros h4{color:var(--teal)} .cons h4{color:var(--red)}
+  .steps{counter-reset:s;list-style:none;padding:0!important}
+  .steps li{counter-increment:s;display:flex;gap:10px;align-items:flex-start}
+  .steps li::before{content:counter(s);flex:none;width:22px;height:22px;border-radius:6px;background:var(--accent-soft);color:var(--accent);font-family:var(--mono);font-weight:700;font-size:12px;display:grid;place-items:center;margin-top:1px}
+  .gantt{display:flex;height:34px;border-radius:7px;overflow:hidden;font-family:var(--mono);font-size:12px;color:#fff;font-weight:700;margin:8px 0 4px}
+  .gantt div{display:grid;place-items:center;border-right:2px solid #fff}
+  .gantt-t{display:flex;font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:12px}
+  .ex-label{font-size:13px;color:var(--muted);margin-top:6px}
+  .ex-res{font-family:var(--mono);font-size:13px;color:var(--text)}
+  .ex-res b{color:var(--accent)}
+  [data-name=fcfs-info] .sx{grid-template-columns:1.25fr 1fr;gap:24px}
+  [data-name=fcfs-info] .sx .card:first-child{padding:28px 32px}
+  [data-name=fcfs-info] .sx .card:first-child h4{font-size:clamp(20px,2vw,28px);margin-bottom:16px}
+  [data-name=fcfs-info] .sx .card:first-child ul{font-size:clamp(16px,1.5vw,21px);line-height:1.55}
+  [data-name=fcfs-info] .sx .card:first-child li{margin:12px 0;gap:14px}
+  [data-name=fcfs-info] .sx .card:first-child li::before{width:30px;height:30px;font-size:15px;border-radius:8px}
+  [data-name=fcfs-info] .sx .card:first-child .tag{font-size:13px;padding:6px 11px}
+  [data-name=tradeoffs] .sx{gap:28px}
+  [data-name=tradeoffs] .sx .card{padding:30px 34px}
+  [data-name=tradeoffs] .sx h4{font-size:clamp(22px,2.2vw,30px);margin-bottom:16px}
+  [data-name=tradeoffs] .sx ul{font-size:clamp(17px,1.6vw,22px);line-height:1.6;padding-left:24px}
+  [data-name=tradeoffs] .sx li{margin:10px 0}
+  [data-name=tradeoffs] .lead{font-size:clamp(17px,1.5vw,22px)}
+  @media (max-width:900px){.sx,[data-name=fcfs-info] .sx{grid-template-columns:1fr}}
 
   /* slide 3 */
   .s3-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-bottom:14px}
@@ -200,7 +230,6 @@
 
   <!-- ============ SLIDE 2 ============ -->
   <section class="slide" data-name="lifecycle">
-    <div class="kicker">Background</div>
     <h2>The life of a process and how we measure scheduling</h2>
     <p class="lead muted" style="margin:0 0 18px">Click any state or arrow in the diagram. The scheduler acts at the highlighted arrow.</p>
     <div class="s2">
@@ -239,7 +268,24 @@
     </div>
   </section>
 
-  <!-- ============ SLIDE 3 ============ -->
+  <!-- ============ SLIDE: FCFS OVERVIEW ============ -->
+  <section class="slide" data-name="fcfs-info">
+    <h2>FCFS at a glance</h2>
+    <p class="lead muted" style="margin:0 0 18px">The simplest scheduler there is: whoever arrives first gets the CPU first. It works like a single checkout line in a shop.</p>
+    <div class="sx">
+      <div class="card">
+        <h4>How it works</h4>
+        <ul class="steps">
+          <li>New processes join the end of the <b>ready queue</b> (a plain FIFO queue).</li>
+          <li>When the CPU is free, the scheduler takes the process at the <b>front</b>.</li>
+          <li>That process runs until it <b>finishes</b> or blocks for I/O. Nobody can interrupt it.</li>
+          <li>Then the next process in line gets its turn.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SLIDE 4 ============ -->
   <section class="slide" data-name="fcfs">
     <div class="s3-head">
       <div>
@@ -290,6 +336,30 @@
             </table>
           </div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SLIDE 5: PROS & CONS ============ -->
+  <section class="slide" data-name="tradeoffs">
+    <h2>FCFS: strengths and weaknesses</h2>
+    <p class="lead muted" style="margin:0 0 18px">Simple and predictable, but not always efficient.</p>
+    <div class="sx">
+      <div class="card pros">
+        <h4>Strengths</h4>
+        <ul>
+          <li>Very simple to implement and to reason about.</li>
+          <li>Fair in the sense of order: nobody is overtaken, so no process starves.</li>
+          <li>Minimal overhead: one context switch per process.</li>
+        </ul>
+      </div>
+      <div class="card cons">
+        <h4>Weaknesses</h4>
+        <ul>
+          <li>Average waiting time can be very high and depends on arrival order.</li>
+          <li>Convoy effect: short jobs get stuck behind one long job.</li>
+          <li>Poor for interactive systems, since there is no time slicing and responsiveness suffers.</li>
+        </ul>
       </div>
     </div>
   </section>
@@ -373,11 +443,10 @@ const slowBtn = document.getElementById('slowBtn');
 slowBtn.onclick = () => {
   demo.slow = !demo.slow;
   slowBtn.textContent = demo.slow ? 'Back to real speed' : 'Slow down time';
-  demo.hist = [{a:demo.cur, d:0}];
-  demo.left = demo.slow ? 1.0 : 0.06;
 };
-function demoStep(dt){
-  const q = demo.slow ? 1.0 : 0.06;
+function demoStep(rawDt){
+  const q = 0.06;
+  const dt = rawDt * (demo.slow ? 0.06 : 1);   // slow-motion = same simulation, slower clock
   demo.left -= dt;
   if (demo.left <= 0){
     demo.cur = (demo.cur + 1) % apps.length;
@@ -387,7 +456,7 @@ function demoStep(dt){
   }
   demo.hist[demo.hist.length - 1].d += dt;
   const a = apps[demo.cur];
-  a.p = (a.p + dt * (demo.slow ? 14 : 33)) % 100;
+  a.p = (a.p + dt * 33) % 100;
   apps.forEach((x, i) => {
     x.fill.style.width = x.p.toFixed(1) + '%';
     x.pct.textContent = Math.floor(x.p) + '%';
@@ -725,7 +794,7 @@ function drawGantt(ctx, W){
 }
 
 /* ================= MAIN LOOP ================= */
-function resizeAll(){ if (names[cur] === 'fcfs') draw(); if (names[cur] === 'intro') drawTimeline(demo.slow ? 1 : .06); }
+function resizeAll(){ if (names[cur] === 'fcfs') draw(); if (names[cur] === 'intro') drawTimeline(.06); }
 window.addEventListener('resize', resizeAll);
 
 let last = performance.now(), lastTable = 0;
