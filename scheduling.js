@@ -133,7 +133,125 @@ function showInfo(k){
   infoEl.innerHTML = `<b>${INFO[k][0]}</b><p>${INFO[k][1]}</p>`;
 }
 document.querySelectorAll('#sd .node, #sd .edge').forEach(g => g.addEventListener('click', () => showInfo(g.dataset.k)));
-showInfo('dispatch');
+
+/* story: one process (a video player) walks through the diagram */
+const LIFE = [
+  { k:'new',      cap:'You double-click a video player. The OS starts creating the process: it reserves memory and fills in a Process Control Block.', who:'os' },
+  { k:'admit',    cap:'The OS accepts it. The player now has everything except the CPU, so it joins the ready queue with the other waiting programs.', who:'os' },
+  { k:'dispatch', cap:'The CPU is free. The scheduler looks at the ready queue and picks the player. A context switch loads its saved state.', who:'sched' },
+  { k:'preempt',  cap:'Its time slice is over (or something more important arrived). The OS takes the CPU back and the player returns to the ready queue.', who:'sched' },
+  { k:'dispatch', cap:'The scheduler picks the player again, and it continues exactly where it stopped.', who:'sched' },
+  { k:'io',       cap:'The player asks the disk for the next part of the video. It cannot go on without it, so it gives up the CPU and waits.', who:'proc' },
+  { k:'iodone',   cap:'The disk is done. The player does not jump onto the CPU: it goes back to the ready queue and waits for its turn.', who:'os' },
+  { k:'dispatch', cap:'The scheduler picks it once more, and the video plays.', who:'sched' },
+  { k:'exit',     cap:'You close the player. It finishes, the OS frees its memory, and the process is gone.', who:'proc' },
+];
+const LIFE_WHO = { os:'the OS decides', proc:'the process decides', sched:'the SCHEDULER decides here' };
+const LIFE_EDGE = { admit:['new','ready'], dispatch:['ready','running'], preempt:['running','ready'], io:['running','waiting'], iodone:['waiting','ready'], exit:['running','term'] };
+const LIFE_C = { new:[75,60], ready:[191,160], running:[431,160], waiting:[311,264], term:[560,60] };
+const life = { i:0, t:0, playing:false, stepping:false, active:false };
+const tokEl = document.getElementById('tok'), lifePlay = document.getElementById('lifePlay');
+function lifeSel(k){ document.querySelectorAll('#sd .node, #sd .edge').forEach(g => g.classList.toggle('sel', g.dataset.k === k)); }
+function lifeEnter(){
+  const s = LIFE[life.i];
+  lifeSel(s.k);
+  infoEl.innerHTML = `<b>Step ${life.i + 1} of ${LIFE.length}: ${INFO[s.k][0]}</b><p>${s.cap}</p><span class="who ${s.who}">${LIFE_WHO[s.who]}</span>`;
+}
+function lifePos(s, t){
+  if (s.k === 'new') return LIFE_C.new;
+  const [a, b] = LIFE_EDGE[s.k], path = document.querySelector(`#sd .edge[data-k=${s.k}] path.vis`), L = path.getTotalLength();
+  const A = LIFE_C[a], B = LIFE_C[b], P0 = path.getPointAtLength(0), P1 = path.getPointAtLength(L);
+  const mix = (p, q, u) => [p[0] + (q[0] - p[0]) * u, p[1] + (q[1] - p[1]) * u];
+  if (t < 0.3) return mix(A, [P0.x, P0.y], t / 0.3);
+  if (t < 1.5){ const u = (t - 0.3) / 1.2, e = u * u * (3 - 2 * u), P = path.getPointAtLength(L * e); return [P.x, P.y]; }
+  if (t < 1.8) return mix([P1.x, P1.y], B, (t - 1.5) / 0.3);
+  return B;
+}
+
+/* other programs moving around the diagram, so the main process is not alone */
+const AMB_COLS = ['#3a7bd5', '#e0486a', '#6f58e0', '#0f9d8f'];
+const AMB_SLOT = { running:[431,160], waiting:[311,264], term:[560,60], new:[75,60] };
+const ambG = document.getElementById('amb');
+const amb = AMB_COLS.map((col, n) => {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  el.setAttribute('r', 9); el.setAttribute('fill', col); el.setAttribute('stroke', '#fff'); el.setAttribute('stroke-width', 2);
+  ambG.appendChild(el);
+  return { el, st:'ready', x:114 - n * 26, y:160, a:1, t:0, dwell:1 + n * 0.8, qt:n, edge:null, to:null, from:null };
+});
+let ambQ = amb.length;
+function ambGo(a, key){
+  const to = LIFE_EDGE[key] ? LIFE_EDGE[key][1] : (key === 'admit' ? 'ready' : null);
+  a.edge = key; a.to = key === 'admit' ? 'ready' : to; a.from = [a.x, a.y]; a.t = 0; a.st = 'moving';
+}
+function ambStep(dt){
+  const s = LIFE[life.i];
+  const mainCpu = s.k === 'dispatch' || ((s.k === 'preempt' || s.k === 'io' || s.k === 'exit') && life.t < 0.6);
+  const cpuBusy = amb.some(a => a.st === 'running' || (a.st === 'moving' && a.to === 'running'));
+  const readyQ = amb.filter(a => a.st === 'ready').sort((p, q) => p.qt - q.qt);
+  const k = Math.min(1, dt * 6);
+  amb.forEach(a => {
+    if (a.st === 'ready'){
+      const i = readyQ.indexOf(a), sx = 114 - i * 26;
+      a.x += (sx - a.x) * k; a.y += (160 - a.y) * k; a.a = 1; a.dwell -= dt;
+      if (i === 0 && a.dwell <= 0 && !cpuBusy && !mainCpu){ ambGo(a, 'dispatch'); a.dwell = 1.6 + Math.random() * 1.6; }
+    } else if (a.st === 'running'){
+      a.x += (AMB_SLOT.running[0] - a.x) * k; a.y += (AMB_SLOT.running[1] - a.y) * k; a.dwell -= dt;
+      const forced = s.k === 'dispatch' && life.t > 0.3;       // the main process was dispatched: this one is preempted
+      if (a.dwell <= 0 || forced){
+        const r = Math.random();
+        ambGo(a, forced || r < 0.5 ? 'preempt' : r < 0.85 ? 'io' : 'exit');
+      }
+    } else if (a.st === 'waiting'){
+      a.x += (AMB_SLOT.waiting[0] - a.x) * k; a.y += (AMB_SLOT.waiting[1] - a.y) * k; a.dwell -= dt;
+      if (a.dwell <= 0) ambGo(a, 'iodone');
+    } else if (a.st === 'term'){
+      a.dwell -= dt; a.a = Math.max(0, a.dwell / 1.2);
+      if (a.dwell <= 0){ a.st = 'new'; a.x = AMB_SLOT.new[0]; a.y = AMB_SLOT.new[1]; a.dwell = 1.4; }
+    } else if (a.st === 'new'){
+      a.a = Math.min(1, a.a + dt * 2); a.dwell -= dt;
+      if (a.dwell <= 0) ambGo(a, 'admit');
+    } else if (a.st === 'moving'){
+      a.t += dt;
+      const path = document.querySelector(`#sd .edge[data-k=${a.edge}] path.vis`), L = path.getTotalLength(), T = 1.3;
+      const u = Math.min(1, a.t / T), P0 = path.getPointAtLength(0);
+      if (u < 0.15){ const v = u / 0.15; a.x = a.from[0] + (P0.x - a.from[0]) * v; a.y = a.from[1] + (P0.y - a.from[1]) * v; }
+      else { const w = (u - 0.15) / 0.85, e = w * w * (3 - 2 * w), P = path.getPointAtLength(L * e); a.x = P.x; a.y = P.y; }
+      if (u >= 1){
+        a.st = a.to;
+        if (a.st === 'ready'){ a.qt = ambQ++; a.dwell = 0.8 + Math.random() * 1.2; }
+        if (a.st === 'waiting') a.dwell = 2 + Math.random() * 1.8;
+        if (a.st === 'running') a.dwell = 1.6 + Math.random() * 1.6;
+        if (a.st === 'term') a.dwell = 1.2;
+      }
+    }
+    a.el.setAttribute('cx', a.x.toFixed(1)); a.el.setAttribute('cy', a.y.toFixed(1)); a.el.setAttribute('opacity', a.a);
+  });
+}
+function lifeStep(dt){
+  ambStep(dt);
+  if (!life.active){ life.active = true; life.i = 0; life.t = 0; life.stepping = false; life.playing = false; lifePlay.textContent = 'Play'; lifeEnter(); }
+  const s = LIFE[life.i], dur = s.k === 'new' ? 3.4 : 4.2;
+  if (life.playing || life.stepping){
+    life.t += dt;
+    if (life.stepping && life.t >= 1.8) life.stepping = false;
+    if (life.playing && life.t >= dur){ life.i = (life.i + 1) % LIFE.length; life.t = 0; lifeEnter(); }
+  }
+  const s2 = LIFE[life.i];
+  if (s2.k !== 'new' && life.t >= 1.8) lifeSel(LIFE_EDGE[s2.k][1]);
+  const p = lifePos(s2, life.t);
+  tokEl.setAttribute('transform', `translate(${p[0]},${p[1]})`);
+}
+function lifePause(){ life.playing = false; life.stepping = false; lifePlay.textContent = 'Play'; }
+document.querySelectorAll('#sd .node, #sd .edge').forEach(g => g.addEventListener('click', lifePause));
+lifePlay.onclick = () => {
+  if (life.playing) lifePause(); else { life.playing = true; lifePlay.textContent = 'Pause'; lifeEnter(); }
+};
+document.getElementById('lifeBack').onclick = () => {
+  life.i = (life.i + LIFE.length - 1) % LIFE.length; life.t = 1.8; life.stepping = false; lifePause(); lifeEnter();
+};
+document.getElementById('lifeStep').onclick = () => {
+  life.i = (life.i + 1) % LIFE.length; life.t = 0; life.stepping = true; lifeEnter();
+};
 
 /* ================= SLIDE 3: newspaper queue (top view) ================= */
 const PCOLS = ['#0f9d8f','#e0486a','#6f58e0','#d98200','#3a7bd5','#d93c3c'];
@@ -273,11 +391,35 @@ function drawCheckout(){
   const { ctx, W, H } = f, g = shopGeom(W, H);
   ctx.clearRect(0, 0, W, H);
   const kw = 200, kx = g.colX - kw / 2;
-  ctx.fillStyle = '#c9ab7a'; rr(ctx, kx, g.counterY, kw, 46, 8); ctx.fill();
-  ctx.fillStyle = '#b48f5c'; ctx.fillRect(kx + 8, g.counterY + 8, kw - 16, 4);
-  ctx.fillStyle = '#1a2233'; ctx.beginPath(); ctx.arc(g.colX, g.counterY + 78, 24, 0, 7); ctx.fill();
+  const cy = g.counterY, t = performance.now() / 1000, busy = shop.people.some(p => p.st === 'serving');
+  // lane sign
+  const sx = kx - 62;
+  ctx.fillStyle = '#8a93a6'; ctx.fillRect(sx - 2, cy - 40, 4, 98);
+  ctx.fillStyle = '#e0486a'; rr(ctx, sx - 46, cy - 66, 92, 26, 6); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = '700 13px "JetBrains Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('EXPRESS', sx, cy - 53);
+  // counter body
+  ctx.fillStyle = '#d9dee8'; rr(ctx, kx - 6, cy - 4, kw + 12, 62, 8); ctx.fill();
+  ctx.fillStyle = '#b6bfcf'; ctx.fillRect(kx - 6, cy + 46, kw + 12, 12);
+  // conveyor belt (moving rollers while serving)
+  ctx.fillStyle = '#2b3347'; rr(ctx, kx, cy, kw - 52, 36, 6); ctx.fill();
+  ctx.save(); ctx.beginPath(); ctx.rect(kx + 4, cy + 3, kw - 60, 30); ctx.clip();
+  ctx.fillStyle = '#434d66';
+  const off = busy ? (t * 30) % 14 : 0;
+  for (let x = kx - 14 + off; x < kx + kw; x += 14) ctx.fillRect(x, cy + 3, 4, 30);
+  ctx.restore();
+  // scanner strip + laser
+  ctx.fillStyle = '#9aa5ba'; ctx.fillRect(kx + kw - 74, cy - 2, 22, 40);
+  ctx.fillStyle = busy && Math.floor(t * 6) % 2 ? '#ff3b4e' : '#7a1f2b'; ctx.fillRect(kx + kw - 70, cy + 16, 14, 3);
+  // cash register
+  ctx.fillStyle = '#3a455f'; rr(ctx, kx + kw - 48, cy - 26, 44, 56, 6); ctx.fill();
+  ctx.fillStyle = busy ? '#6fe3b3' : '#3d7a63'; rr(ctx, kx + kw - 42, cy - 20, 32, 14, 3); ctx.fill();
+  ctx.fillStyle = '#9aa5ba';
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) ctx.fillRect(kx + kw - 42 + c * 11, cy + 2 + r * 9, 8, 6);
+  // cashier = CPU
+  ctx.fillStyle = '#1a2233'; ctx.beginPath(); ctx.arc(g.colX, cy + 88, 24, 0, 7); ctx.fill();
   ctx.fillStyle = '#fff'; ctx.font = '600 14px "Space Grotesk", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('CPU', g.colX, g.counterY + 78);
+  ctx.fillText('CPU', g.colX, cy + 88);
   shop.people.forEach(p => {
     const r = 18;
     ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.beginPath(); ctx.arc(p.x + 2, p.y + 3, r, 0, 7); ctx.fill();
@@ -350,112 +492,196 @@ function drawER(){
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
 }
 
-/* ================= Round Robin overview: sharing a game console ================= */
-const RRQ = 1.4;   // quantum of the animation (seconds)
-const rrA = { q:[], cur:null, out:[], spawnIn:0.2, n:0 };
+/* ================= Round Robin overview: poker table ================= */
+// The dealer (CPU) gives ONE card (= one quantum) to each player in turn. After a full round,
+// players who have all the cards they need leave and new players sit down.
+const pk = { seats:[null, null, null, null, null], order:[], fly:null, wait:0.4, spawnIn:0.2, n:0, out:[] };
+const PK_ANG = [-30, 30, 90, 150, 210].map(a => a * Math.PI / 180);
+function pkGeom(W, H){
+  const rx = Math.max(110, Math.min(190, W * 0.14)), ry = rx * 0.62;
+  return { rx, ry, cx: W - rx * 1.25 - 50, cy: H / 2 + 40 };
+}
+function pkSeat(g, i, s){ return { x: g.cx + g.rx * s * Math.cos(PK_ANG[i]), y: g.cy + g.ry * s * Math.sin(PK_ANG[i]) }; }
 function rrStep(dt){
   const f = fitCanvas(document.getElementById('rrcv')); if (!f) return;
-  const { W, H } = f, g = shopGeom(W, H);
-  const maxQ = Math.min(5, Math.max(3, Math.floor((g.frontY + 10) / g.gap)));
-  rrA.spawnIn -= dt;
-  if (rrA.spawnIn <= 0 && rrA.q.length + (rrA.cur ? 1 : 0) < maxQ){
-    const need = 1.2 + Math.random() * 3.6;
-    rrA.q.push({ id: ++rrA.n, x: g.colX + 60, y: -16, need, rem: need, t:0, col: PCOLS[rrA.n % PCOLS.length] });
-    rrA.spawnIn = 2.6 + Math.random() * 1.2;
+  const { W, H } = f, g = pkGeom(W, H);
+  pk.spawnIn -= dt;
+  const free = pk.seats.map((p, i) => p ? -1 : i).filter(i => i >= 0);
+  if (pk.spawnIn <= 0 && free.length){
+    const i = free[Math.floor(Math.random() * free.length)];
+    pk.seats[i] = { id: ++pk.n, need: 2 + Math.floor(Math.random() * 4), cards: 0, a: 0, col: PCOLS[pk.n % PCOLS.length] };
+    pk.spawnIn = 1.2 + Math.random() * 1.6;
   }
-  if (!rrA.cur && rrA.q.length){ rrA.cur = rrA.q.shift(); rrA.cur.t = 0; }
-  const k = Math.min(1, dt * 6);
-  rrA.q.forEach((p, i) => { p.x += (g.colX - p.x) * k; p.y += (g.frontY - g.gap * (i + 1) - p.y) * k; });
-  const c = rrA.cur;
-  if (c){
-    c.x += (g.colX - c.x) * k; c.y += (g.frontY - c.y) * k;
-    if (Math.abs(c.x - g.colX) < 2 && Math.abs(c.y - g.frontY) < 2){
-      const use = Math.min(dt, c.rem); c.t += dt; c.rem -= use;
-      if (c.rem <= 0.001){ rrA.out.push(c); rrA.cur = null; }
-      else if (c.t >= RRQ){ rrA.q.push(c); rrA.cur = null; }     // quantum over: back of the line
+  pk.seats.forEach(p => { if (p) p.a = Math.min(1, p.a + dt * 3); });
+  pk.out.forEach(p => { p.t += dt; });
+  pk.out = pk.out.filter(p => p.t < 1.2);
+  if (pk.fly){
+    pk.fly.t += dt;
+    if (pk.fly.t >= 0.45){
+      const p = pk.seats[pk.fly.seat]; if (p) p.cards++;
+      pk.fly = null; pk.wait = 0.2;
+    }
+  } else if ((pk.wait -= dt) <= 0){
+    if (!pk.order.length){
+      pk.order = pk.seats.map((p, i) => p && p.a >= 1 ? i : -1).filter(i => i >= 0);
+      if (!pk.order.length){ pk.wait = 0.3; }
+    }
+    if (pk.order.length){
+      pk.fly = { seat: pk.order.shift(), t: 0 };
+      if (!pk.order.length) pk.roundEnd = true;
     }
   }
-  rrA.out.forEach(p => { p.x -= 130 * dt; });
-  rrA.out = rrA.out.filter(p => p.x > -80);
+  if (!pk.fly && pk.roundEnd && pk.wait > 0 && pk.order.length === 0){
+    // round finished: whoever has all their cards leaves
+    pk.seats.forEach((p, i) => {
+      if (p && p.cards >= p.need){
+        const s = pkSeat(g, i, 1.25);
+        pk.out.push({ x: s.x, y: s.y, dx: Math.cos(PK_ANG[i]), dy: Math.sin(PK_ANG[i]), col: p.col, t: 0 });
+        pk.seats[i] = null;
+      }
+    });
+    pk.roundEnd = false; pk.wait = 0.7;
+  }
   drawRR();
 }
 function drawRR(){
   const f = fitCanvas(document.getElementById('rrcv')); if (!f) return;
-  const { ctx, W, H } = f, g = shopGeom(W, H);
+  const { ctx, W, H } = f, g = pkGeom(W, H);
   ctx.clearRect(0, 0, W, H);
-  const kw = 200, kx = g.colX - kw / 2;
-  ctx.fillStyle = '#2b3347'; rr(ctx, kx, g.counterY, kw, 46, 8); ctx.fill();      // console
-  ctx.fillStyle = '#0f9d8f'; rr(ctx, g.colX - 44, g.counterY + 12, 88, 22, 4); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.font = '700 11px "JetBrains Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('quantum ' + RRQ.toFixed(1), g.colX, g.counterY + 23);
-  ctx.fillStyle = '#1a2233'; ctx.beginPath(); ctx.arc(g.colX, g.counterY + 78, 24, 0, 7); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.font = '600 14px "Space Grotesk", sans-serif';
-  ctx.fillText('CPU', g.colX, g.counterY + 78);
-  [...rrA.q, ...rrA.out, ...(rrA.cur ? [rrA.cur] : [])].forEach(p => {
-    const r = 18;
-    ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.beginPath(); ctx.arc(p.x + 2, p.y + 3, r, 0, 7); ctx.fill();
-    ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.fill();
-    if (p === rrA.cur){                       // quantum ring
-      ctx.strokeStyle = '#1a2233'; ctx.lineWidth = 3; ctx.beginPath();
-      ctx.arc(p.x, p.y, r + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, p.t / RRQ)); ctx.stroke();
+  // table
+  ctx.fillStyle = '#6b4a2b'; ctx.beginPath(); ctx.ellipse(g.cx, g.cy, g.rx + 14, g.ry + 14, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#0e7a55'; ctx.beginPath(); ctx.ellipse(g.cx, g.cy, g.rx, g.ry, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(g.cx, g.cy, g.rx - 12, g.ry - 12, 0, 0, 7); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.font = '700 11px "JetBrains Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('1 card per turn', g.cx, g.cy - 4);
+  // dealer
+  const dx = g.cx, dy = g.cy - g.ry - 44;
+  ctx.fillStyle = '#1a2233'; ctx.beginPath(); ctx.arc(dx, dy, 24, 0, 7); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = '600 14px "Space Grotesk", sans-serif'; ctx.fillText('CPU', dx, dy);
+  ctx.fillStyle = '#fff'; rr(ctx, dx + 30, g.cy - g.ry + 4, 14, 20, 3); ctx.fill();       // deck
+  ctx.fillStyle = '#e0486a'; rr(ctx, dx + 33, g.cy - g.ry + 7, 8, 14, 2); ctx.fill();
+  // players
+  pk.seats.forEach((p, i) => {
+    if (!p) return;
+    const s = pkSeat(g, i, 1.25), c = pkSeat(g, i, 0.58);
+    ctx.globalAlpha = p.a;
+    ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.beginPath(); ctx.arc(s.x + 2, s.y + 3, 18, 0, 7); ctx.fill();
+    ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(s.x, s.y, 18, 0, 7); ctx.fill();
+    const w = p.need * 15, x0 = c.x - w / 2;
+    for (let k = 0; k < p.need; k++){
+      if (k < p.cards){ ctx.fillStyle = '#fff'; rr(ctx, x0 + k * 15, c.y - 10, 12, 18, 2); ctx.fill(); ctx.fillStyle = p.col; rr(ctx, x0 + k * 15 + 2, c.y - 8, 8, 14, 1.5); ctx.fill(); }
+      else { ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]); rr(ctx, x0 + k * 15, c.y - 10, 12, 18, 2); ctx.stroke(); ctx.setLineDash([]); }
     }
-    const bw = 60, bx = p.x + r + 8;          // work still to do
-    ctx.fillStyle = '#e5e5e2'; rr(ctx, bx, p.y - 4, bw, 8, 4); ctx.fill();
-    ctx.fillStyle = p.col; rr(ctx, bx, p.y - 4, Math.max(0, bw * p.rem / p.need), 8, 4); ctx.fill();
+    ctx.globalAlpha = 1;
+  });
+  // flying card
+  if (pk.fly){
+    const c = pkSeat(g, pk.fly.seat, 0.58), p = pk.seats[pk.fly.seat], u = Math.min(1, pk.fly.t / 0.45), e = u * u * (3 - 2 * u);
+    const tx = p ? c.x - p.need * 7.5 + p.cards * 15 + 6 : c.x, ty = c.y - 1;
+    const fx = dx + 37, fy = g.cy - g.ry + 14;
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#1a2233'; ctx.lineWidth = 1;
+    ctx.save(); ctx.translate(fx + (tx - fx) * e, fy + (ty - fy) * e); ctx.rotate(e * 6.28);
+    rr(ctx, -6, -9, 12, 18, 2); ctx.fill(); ctx.stroke(); ctx.restore();
+  }
+  // players leaving
+  pk.out.forEach(p => {
+    const u = p.t / 1.2;
+    ctx.globalAlpha = 1 - u; ctx.fillStyle = p.col;
+    ctx.beginPath(); ctx.arc(p.x + p.dx * 120 * u, p.y + p.dy * 80 * u, 18, 0, 7); ctx.fill();
+    ctx.globalAlpha = 1;
   });
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
 }
 
-/* ================= CFS overview: always serve whoever got the least ================= */
-const cfsA = { ps:null, cur:null, t:0 };
-const CFS_SLICE = 1.3;
+/* ================= CFS overview: bar, serve whoever had the fewest drinks ================= */
+const bar = { stools:[null, null, null, null, null], fly:null, wait:0.4, spawnIn:0.2, n:0, out:[] };
+function barGeom(W, H){
+  const rx = Math.max(110, Math.min(190, W * 0.14));
+  return { rx, cx: W - rx - 60, cy: H / 2 + 20, sp: 2 * rx / 5 };
+}
+function barPos(g, i){ return { x: g.cx - g.rx + (i + 0.5) * g.sp, y: g.cy + 62 }; }
 function cfsStep(dt){
   const f = fitCanvas(document.getElementById('cfscv')); if (!f) return;
-  const { W, H } = f, g = shopGeom(W, H);
-  if (!cfsA.ps){
-    const ws = [1, 2, 1, 0.5, 1];
-    cfsA.ps = ws.map((w, i) => ({ id:i + 1, w, vr: Math.random() * 0.6, x:g.colX, y:-20, col: PCOLS[(i + 1) % PCOLS.length] }));
+  const { W, H } = f, g = barGeom(W, H);
+  bar.spawnIn -= dt;
+  const free = bar.stools.map((p, i) => p ? -1 : i).filter(i => i >= 0);
+  if (bar.spawnIn <= 0 && free.length){
+    const i = free[Math.floor(Math.random() * free.length)];
+    bar.stools[i] = { id: ++bar.n, limit: 3 + Math.floor(Math.random() * 3), drinks: 0, a: 0, sip: 0, done: 0, col: PCOLS[bar.n % PCOLS.length] };
+    bar.spawnIn = 1.5 + Math.random() * 1.8;
   }
-  const P = cfsA.ps;
-  if (!cfsA.cur){ cfsA.cur = P.filter(p => p !== cfsA.cur).sort((a, b) => a.vr - b.vr || a.id - b.id)[0]; cfsA.t = 0; }
-  const waiting = P.filter(p => p !== cfsA.cur).sort((a, b) => a.vr - b.vr || a.id - b.id);
-  const k = Math.min(1, dt * 6);
-  waiting.forEach((p, i) => { p.x += (g.colX - p.x) * k; p.y += (g.frontY - g.gap * (i + 1) - p.y) * k; });
-  const c = cfsA.cur; c.x += (g.colX - c.x) * k; c.y += (g.frontY - c.y) * k;
-  if (Math.abs(c.y - g.frontY) < 2){
-    cfsA.t += dt; c.vr += dt / c.w * 0.5;                    // heavier process: vruntime grows slower
-    if (cfsA.t >= CFS_SLICE) cfsA.cur = null;
+  bar.stools.forEach((p, i) => {
+    if (!p) return;
+    p.a = Math.min(1, p.a + dt * 3); p.sip = Math.max(0, p.sip - dt);
+    if (p.drinks >= p.limit && !(bar.fly && bar.fly.seat === i)){          // drunk enough: leave
+      p.done += dt;
+      if (p.done > 0.9){ const s = barPos(g, i); bar.out.push({ x: s.x, y: s.y, col: p.col, t: 0, ph: i }); bar.stools[i] = null; }
+    }
+  });
+  bar.out.forEach(p => { p.t += dt; });
+  bar.out = bar.out.filter(p => p.t < 1.8);
+  if (bar.fly){
+    bar.fly.t += dt;
+    if (bar.fly.t >= 0.5){
+      const p = bar.stools[bar.fly.seat]; if (p){ p.drinks++; p.sip = 0.5; }
+      bar.fly = null; bar.wait = 0.35;
+    }
+  } else if ((bar.wait -= dt) <= 0){
+    // the bartender serves whoever has had the FEWEST drinks so far
+    const cand = bar.stools.map((p, i) => ({ p, i })).filter(o => o.p && o.p.a >= 1 && o.p.drinks < o.p.limit)
+      .sort((a, b) => a.p.drinks - b.p.drinks || a.p.id - b.p.id)[0];
+    if (cand) bar.fly = { seat: cand.i, t: 0 }; else bar.wait = 0.2;
   }
   drawCFS();
 }
 function drawCFS(){
-  const f = fitCanvas(document.getElementById('cfscv')); if (!f || !cfsA.ps) return;
-  const { ctx, W, H } = f, g = shopGeom(W, H);
+  const f = fitCanvas(document.getElementById('cfscv')); if (!f) return;
+  const { ctx, W, H } = f, g = barGeom(W, H), t = performance.now() / 1000;
   ctx.clearRect(0, 0, W, H);
-  const kw = 200, kx = g.colX - kw / 2;
-  ctx.fillStyle = '#e9eef5'; rr(ctx, kx, g.counterY, kw, 46, 8); ctx.fill();
-  ctx.fillStyle = '#55627c'; ctx.font = '700 11px "JetBrains Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('least CPU so far goes next', g.colX, g.counterY + 23);
-  ctx.fillStyle = '#1a2233'; ctx.beginPath(); ctx.arc(g.colX, g.counterY + 78, 24, 0, 7); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.font = '600 14px "Space Grotesk", sans-serif';
-  ctx.fillText('CPU', g.colX, g.counterY + 78);
-  const minVr = Math.min(...cfsA.ps.map(p => p.vr));
-  cfsA.ps.forEach(p => {
-    const r = 18;
-    ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.beginPath(); ctx.arc(p.x + 2, p.y + 3, r, 0, 7); ctx.fill();
-    ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.fill();
-    if (p === cfsA.cur){
-      ctx.strokeStyle = '#1a2233'; ctx.lineWidth = 3; ctx.beginPath();
-      ctx.arc(p.x, p.y, r + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, cfsA.t / CFS_SLICE)); ctx.stroke();
+  const bx = g.cx - g.rx - 20, bw = 2 * g.rx + 40;
+  // back shelf with bottles
+  ctx.fillStyle = '#6b4a2b'; ctx.fillRect(bx, g.cy - 112, bw, 6);
+  const bc = ['#0f9d8f', '#d98200', '#e0486a', '#6f58e0', '#3a7bd5'];
+  for (let k = 0; k < 9; k++){ ctx.fillStyle = bc[k % 5]; rr(ctx, bx + 12 + k * (bw - 36) / 8, g.cy - 140, 12, 28, 3); ctx.fill(); }
+  // bartender
+  ctx.fillStyle = '#1a2233'; ctx.beginPath(); ctx.arc(g.cx, g.cy - 52, 24, 0, 7); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = '600 14px "Space Grotesk", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('CPU', g.cx, g.cy - 52);
+  // counter
+  ctx.fillStyle = '#8a5a2e'; rr(ctx, bx, g.cy - 16, bw, 34, 8); ctx.fill();
+  ctx.fillStyle = '#a8713a'; rr(ctx, bx, g.cy - 16, bw, 10, 6); ctx.fill();
+  ctx.fillStyle = '#5e3d1e'; ctx.fillRect(bx + 10, g.cy + 18, bw - 20, 10);
+  // customers
+  bar.stools.forEach((p, i) => {
+    if (!p) return;
+    const s = barPos(g, i), amp = 5 * p.drinks / p.limit, sw = Math.sin(t * 3 + i) * amp * (p.drinks ? 1 : 0);
+    ctx.globalAlpha = p.a;
+    ctx.fillStyle = '#3a455f'; ctx.fillRect(s.x - 2, s.y + 24, 4, 24); ctx.fillRect(s.x - 14, s.y + 46, 28, 4);   // stool
+    ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.beginPath(); ctx.arc(s.x + sw + 2, s.y + 3, 18, 0, 7); ctx.fill();
+    ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(s.x + sw, s.y, 18, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(224,72,106,' + (0.55 * p.drinks / p.limit) + ')'; ctx.beginPath(); ctx.arc(s.x + sw - 8, s.y + 4, 4, 0, 7); ctx.arc(s.x + sw + 8, s.y + 4, 4, 0, 7); ctx.fill();   // flushed cheeks
+    if (p.sip > 0){ ctx.fillStyle = '#e8a53a'; rr(ctx, s.x + sw + 14, s.y - 22 - p.sip * 6, 10, 14, 2); ctx.fill(); }
+    for (let k = 0; k < p.limit; k++){                      // drinks so far / how many until drunk
+      ctx.fillStyle = k < p.drinks ? '#e8a53a' : 'rgba(26,34,51,.15)';
+      ctx.beginPath(); ctx.arc(s.x - (p.limit - 1) * 6 + k * 12, s.y + 66, 4, 0, 7); ctx.fill();
     }
-    ctx.fillStyle = '#fff'; ctx.font = '700 11px "JetBrains Mono", monospace';
-    ctx.fillText(p.w === 1 ? 'x1' : p.w === 2 ? 'x2' : 'x0.5', p.x, p.y + .5);
-    const bx = p.x + r + 8, bl = Math.min(100, 14 + (p.vr - minVr) * 70);       // vruntime bar
-    ctx.fillStyle = '#e5e5e2'; rr(ctx, bx, p.y - 4, 100, 8, 4); ctx.fill();
-    ctx.fillStyle = p.col; rr(ctx, bx, p.y - 4, bl, 8, 4); ctx.fill();
+    ctx.globalAlpha = 1;
+  });
+  // flying glass
+  if (bar.fly){
+    const s = barPos(g, bar.fly.seat), u = Math.min(1, bar.fly.t / 0.5), gx = g.cx + (s.x - g.cx) * u;
+    ctx.fillStyle = 'rgba(255,255,255,.9)'; rr(ctx, gx - 5, g.cy - 34, 10, 16, 2); ctx.fill();
+    ctx.fillStyle = '#e8a53a'; ctx.fillRect(gx - 4, g.cy - 28, 8, 9);
+  }
+  // drunk customers staggering away
+  bar.out.forEach(p => {
+    const u = p.t / 1.8;
+    ctx.globalAlpha = 1 - u * u; ctx.fillStyle = p.col;
+    ctx.beginPath(); ctx.arc(p.x - 220 * u + Math.sin(p.t * 6 + p.ph) * 12, p.y + Math.sin(p.t * 4) * 4, 18, 0, 7); ctx.fill();
+    ctx.globalAlpha = 1;
   });
   ctx.fillStyle = '#8591a8'; ctx.font = '500 11px "JetBrains Mono", monospace'; ctx.textAlign = 'right';
-  ctx.fillText('vruntime bars  ·  x2 = double weight', W - 40, 24);
+  ctx.fillText('fewest drinks so far is served next  ·  dots = drinks until drunk', W - 40, 24);
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
 }
 
@@ -800,6 +1026,8 @@ function drawGantt(ctx, W){
 
 let lastTable = 0;
 function step(dt, now){
+  const f = fitCanvas(cv); if (!f) return;
+  layout(f.W, f.H);                         // layout must exist before positions are animated, else x/y become NaN (invisible)
   if (!paused){ simAdvance(dt * cfg.speed); S.beltOff += dt * 26; }
   if (!paused || now < S.animUntil) updateVisuals(dt);
   draw();
@@ -819,6 +1047,7 @@ function frame(now){
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
   const name = names[cur];
   if (name === 'intro') demoStep(dt);
+  if (name === 'lifecycle') lifeStep(dt); else life.active = false;
   if (name === 'fcfs-info') paperStep(dt);
   if (sims[name]) sims[name].step(dt, now);
   if (name === 'sjf-info') checkoutStep(dt);

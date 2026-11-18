@@ -26,6 +26,16 @@
       </div>
 
       <div class="demo card">
+        <svg class="magic-hat" viewBox="0 0 120 100" aria-hidden="true">
+          <ellipse cx="60" cy="82" rx="54" ry="13" fill="#1a2233"/>
+          <path d="M26 80 L32 22 Q60 8 88 22 L94 80 Q60 92 26 80 Z" fill="#232c42"/>
+          <ellipse cx="60" cy="22" rx="28" ry="7" fill="#151b2b"/>
+          <path d="M28 66 Q60 78 92 66 L94 80 Q60 92 26 80 Z" fill="#d98200"/>
+          <rect x="52" y="68" width="16" height="16" rx="2" fill="none" stroke="#f4c460" stroke-width="2.5" transform="rotate(4 60 76)"/>
+          <path d="M40 30 Q42 50 38 62" stroke="rgba(255,255,255,.18)" stroke-width="4" fill="none" stroke-linecap="round"/>
+          <path d="M96 8 l3 7 7 3 -7 3 -3 7 -3 -7 -7 -3 7 -3z" fill="#f4c460"/>
+          <circle cx="12" cy="30" r="2.5" fill="#f4c460"/>
+        </svg>
         <h3>What you see</h3>
         <div class="sub">Three programs, all "running at once"</div>
         <div id="apps"></div>
@@ -44,7 +54,7 @@
   <!-- ============ SLIDE 2 ============ -->
   <section class="slide" data-name="lifecycle">
     <h2>The life of a process</h2>
-    <p class="lead muted" style="margin:0 0 18px">Click any state or arrow in the diagram. The scheduler acts at the highlighted arrow.</p>
+    <p class="lead muted" style="margin:0 0 18px">Follow one program, a video player, from the moment you open it until you close it. The scheduler acts at the highlighted arrows.</p>
     <div class="s2">
       <div>
         <div class="diagram card">
@@ -55,7 +65,7 @@
             </defs>
             <g class="edge" data-k="admit"><path class="hit" d="M105,82 L170,138"/><path class="vis" d="M105,82 L168,136" marker-end="url(#ah)"/><text x="112" y="122">admitted</text></g>
             <g class="edge key" data-k="dispatch"><path class="hit" d="M246,172 L374,172"/><path class="vis" d="M246,172 L372,172" marker-end="url(#ahA)"/><text x="310" y="194">dispatch (scheduler)</text></g>
-            <g class="edge" data-k="preempt"><path class="hit" d="M376,146 Q310,96 244,146"/><path class="vis" d="M376,146 Q310,98 246,144" marker-end="url(#ah)"/><text x="310" y="108">interrupt / time up</text></g>
+            <g class="edge key" data-k="preempt"><path class="hit" d="M376,146 Q310,96 244,146"/><path class="vis" d="M376,146 Q310,98 246,144" marker-end="url(#ah)"/><text x="310" y="108">interrupt / time up</text></g>
             <g class="edge" data-k="io"><path class="hit" d="M440,182 Q440,252 366,262"/><path class="vis" d="M440,182 Q440,252 368,262" marker-end="url(#ah)"/><text x="470" y="240">I/O wait</text></g>
             <g class="edge" data-k="iodone"><path class="hit" d="M254,262 Q182,252 182,184"/><path class="vis" d="M254,262 Q182,252 182,186" marker-end="url(#ah)"/><text x="160" y="240">I/O done</text></g>
             <g class="edge" data-k="exit"><path class="hit" d="M462,138 L530,82"/><path class="vis" d="M462,138 L528,84" marker-end="url(#ah)"/><text x="530" y="122">exit</text></g>
@@ -64,7 +74,16 @@
             <g class="node" data-k="running"><rect x="376" y="138" width="110" height="44" rx="10"/><text x="431" y="160">Running</text></g>
             <g class="node" data-k="waiting"><rect x="256" y="242" width="110" height="44" rx="10"/><text x="311" y="264">Waiting</text></g>
             <g class="node" data-k="term"><rect x="500" y="38" width="120" height="44" rx="10"/><text x="560" y="60">Terminated</text></g>
+            <g id="rq" pointer-events="none"><text x="62" y="190" class="rqt">ready queue</text></g>
+            <g id="amb" pointer-events="none"></g>
+            <g id="tok" pointer-events="none"><circle r="13" fill="#d98200" stroke="#fff" stroke-width="2.5"/><text y="1" class="tokt">P</text></g>
           </svg>
+        </div>
+        <div class="controls" style="margin-top:12px;justify-content:flex-start">
+          <button class="btn" id="lifeBack">‹ Back</button>
+          <button class="btn primary" id="lifePlay" style="min-width:92px">Play</button>
+          <button class="btn" id="lifeStep">Step ›</button>
+          <span class="muted" style="font-size:13px;align-self:center">Click any state or arrow to read about it.</span>
         </div>
       </div>
       <div class="info" id="info"></div>
@@ -75,19 +94,28 @@
   <section class="slide" data-name="metrics">
     <h2>How we measure scheduling</h2>
     <p class="lead muted" style="margin:0 0 14px">These are the numbers used to compare scheduling algorithms.</p>
-    <h5 class="mgroup">Per process</h5>
-    <div class="metrics m5">
-        <div class="metric card"><h4>Arrival time</h4><p>When the process enters the ready queue.</p><span class="goal">input</span></div>
-        <div class="metric card"><h4>Burst time</h4><p>How much CPU time the process needs to finish.</p><span class="goal">input</span></div>
-        <div class="metric card"><h4>Waiting time</h4><p>Total time spent in the ready queue, not running.</p><code>turnaround − burst</code><span class="goal down">lower is better</span></div>
-        <div class="metric card"><h4>Turnaround time</h4><p>Total time from arrival to completion.</p><code>completion − arrival</code><span class="goal down">lower is better</span></div>
-        <div class="metric card"><h4>Response time</h4><p>Time until the process first gets the CPU.</p><code>first run − arrival</code><span class="goal down">lower is better</span></div>
-    </div>
-    <h5 class="mgroup">System-wide</h5>
-    <div class="metrics m3">
-        <div class="metric card"><h4>Throughput</h4><p>How many processes finish per unit of time.</p><code>completed ÷ time</code><span class="goal up">higher is better</span></div>
-        <div class="metric card"><h4>CPU utilization</h4><p>Share of time the CPU does useful work.</p><code>busy time ÷ total time</code><span class="goal up">higher is better</span></div>
-        <div class="metric card cs"><h4>Context switch</h4><p>Saving one process's state (registers, PC…) and loading the next one's. Pure overhead: no useful work gets done during it.</p><span class="goal down">lower is better</span></div>
+    <div class="mcols">
+      <div class="mleft">
+        <h5 class="mgroup">Process data (given)</h5>
+        <div class="metrics m1">
+          <div class="metric card"><h4>Arrival time</h4><p>When the process enters the ready queue.</p><span class="goal">input</span></div>
+          <div class="metric card"><h4>Burst time</h4><p>How much CPU time the process needs to finish.</p><span class="goal">input</span></div>
+        </div>
+      </div>
+      <div class="mright">
+        <h5 class="mgroup">Per process (measured)</h5>
+        <div class="metrics m3">
+          <div class="metric card"><h4>Waiting time</h4><p>Total time spent in the ready queue, not running.</p><code>turnaround − burst</code><span class="goal down">lower is better</span></div>
+          <div class="metric card"><h4>Turnaround time</h4><p>Total time from arrival to completion.</p><code>completion − arrival</code><span class="goal down">lower is better</span></div>
+          <div class="metric card"><h4>Response time</h4><p>Time until the process first gets the CPU.</p><code>first run − arrival</code><span class="goal down">lower is better</span></div>
+        </div>
+        <h5 class="mgroup">System-wide</h5>
+        <div class="metrics m3">
+          <div class="metric card"><h4>Throughput</h4><p>How many processes finish per unit of time.</p><code>completed ÷ time</code><span class="goal up">higher is better</span></div>
+          <div class="metric card"><h4>CPU utilization</h4><p>Share of time the CPU does useful work.</p><code>busy time ÷ total time</code><span class="goal up">higher is better</span></div>
+          <div class="metric card cs"><h4>Context switch</h4><p>Saving one process's state and loading the next one's. Pure overhead: no useful work happens during it.</p><span class="goal down">lower is better</span></div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -329,7 +357,6 @@
     <div class="s3-head">
       <div>
         <h2>Round Robin <span class="muted" style="font-weight:400">(RR)</span></h2>
-        <p>Each process gets the CPU for at most one <b>time quantum</b>. If it is not finished, it goes to the back of the queue and the next one runs. Like taking turns on a shared game console.</p>
       </div>
     </div>
 
@@ -401,7 +428,6 @@
     <div class="s3-head">
       <div>
         <h2>Completely Fair Scheduler <span class="muted" style="font-weight:400">(CFS)</span></h2>
-        <p>The process with the smallest <b>vruntime</b> runs next. The queue is sorted by vruntime, so the leftmost box (closest to the CPU) is always next. Badges show each process's nice value; lower nice means more CPU share.</p>
       </div>
     </div>
 

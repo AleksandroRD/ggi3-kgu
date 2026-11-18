@@ -201,3 +201,33 @@ input[type=range]{accent-color:var(--accent);width:100%}
 
 .prio-legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 .prio-legend span{font-family:var(--mono);font-size:12.5px;padding:4px 10px;border-radius:999px;color:#fff;font-weight:700}
+
+.demo{position:relative}
+.magic-hat{position:absolute;top:-44px;right:-14px;width:96px;height:auto;transform:rotate(12deg);pointer-events:none;filter:drop-shadow(0 3px 4px rgba(0,0,0,.18));z-index:2}
+
+.mcols{display:grid;grid-template-columns:1fr 2.2fr;gap:28px;align-items:start}
+.metrics.m1{grid-template-columns:1fr}
+@media (max-width:1100px){.mcols{grid-template-columns:1fr}}
+
+/* ---- simulation slides: metrics on a monitor screen at the right ---- */
+.s3{grid-template-columns:minmax(0,1fr) 230px;max-width:1240px;align-items:start}
+.s3 .stage,.s3 .controls{grid-column:1}
+.s3 .stats{grid-column:2;grid-row:1 / span 2;display:flex;flex-direction:column;gap:8px;position:relative;overflow:hidden;
+  padding:34px 14px 14px;border-radius:16px;background:#0b1a16;border:10px solid #2a3142;
+  box-shadow:inset 0 0 28px rgba(0,255,170,.14),0 6px 18px rgba(26,34,51,.28)}
+.s3 .stats::before{content:'SYSTEM MONITOR';position:absolute;top:10px;left:14px;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:#4fd8a4;opacity:.8}
+.s3 .stats::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px)}
+.s3 .stat{background:transparent;border:0;border-bottom:1px dashed rgba(79,216,164,.25);border-radius:0;padding:8px 2px}
+.s3 .stat:last-child{border-bottom:0}
+.s3 .stat .k{color:#6fb89c;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.s3 .stat .v{color:#5dffb8;font-size:24px;text-shadow:0 0 8px rgba(93,255,184,.55)}
+.s3 .stat .u{color:#6fb89c}
+.s3 .stat.hl{background:transparent;border-color:rgba(79,216,164,.25)}
+.s3 .stat.hl .v{color:#ffc247;text-shadow:0 0 8px rgba(255,194,71,.5)}
+@media (max-width:1000px){.s3{grid-template-columns:1fr}.s3 .stage,.s3 .controls,.s3 .stats{grid-column:1;grid-row:auto}}
+
+/* slide 2: story token */
+.rqt{fill:var(--dim);font-family:var(--mono);font-size:10px;text-anchor:middle}
+.tokt{fill:#fff;font-family:var(--mono);font-size:12px;font-weight:700;text-anchor:middle;dominant-baseline:middle}
+.who{display:inline-block;margin-top:10px;font-family:var(--mono);font-size:12px;padding:3px 9px;border-radius:6px;border:1px solid var(--line2);color:var(--muted)}
+.who.sched{color:var(--accent);border-color:rgba(217,130,0,.5);background:#fff3df;font-weight:700}
