@@ -65,7 +65,7 @@ let busy = false;
 
 const nextFrame = () => new Promise(r => requestAnimationFrame(r));
 const play = (el, keyframes, opts) => {
-  const a = el.animate(keyframes, { fill: 'forwards', ...opts });
+  const a = el.animate(keyframes, { fill: 'both', ...opts });   // 'both': also holds the start value after playing in reverse
   a.persist();   // otherwise the browser drops it once a later animation overrides it, and it can't be reversed
   return a;
 };
@@ -121,31 +121,34 @@ function prepare(t) {
   const backcover = Object.assign(document.createElement('div'), { className: 'backcover' });
   const page = Object.assign(document.createElement('div'), { className: 'page' });
   page.style.transform = `translateZ(${T - 3}px)`;
-  const live = document.createElement('iframe');                    // live presentation on the page
+  const thumb = Object.assign(document.createElement('div'), { className: 'thumb' });  // the small slide
+  const live = document.createElement('iframe');                    // live presentation inside it
   live.src = t.file;
   live.tabIndex = -1;
   live.setAttribute('aria-hidden', 'true');
-  page.appendChild(live);
+  thumb.appendChild(live);
+  page.appendChild(thumb);
   const cover = Object.assign(document.createElement('div'), { className: 'cover' });
   cover.style.transform = `translateZ(${T}px)`;
-  cover.innerHTML = '<div class="cover-front"><div class="chip"></div><div><h2></h2><p></p></div></div><div class="cover-back"></div>';
-  cover.querySelector('h2').textContent = t.title;
-  cover.querySelector('p').textContent = t.subtitle || '';
+  cover.innerHTML = '<div class="cover-front"><div class="chip"></div><div><h2></h2><p></p></div></div><div class="cover-back"><h3></h3><p></p></div>';
+  cover.querySelector('h2').textContent = cover.querySelector('h3').textContent = t.title;
+  cover.querySelectorAll('p').forEach(el => el.textContent = t.subtitle || '');
   box.append(backcover, spine, page, cover);
   stage.append(box);
-  prepared = { id: t.id, box, cover, page, live, W, H, T, vw: 0, vh: 0 };
+  prepared = { id: t.id, box, cover, page, thumb, live, W, H, T, vw: 0, vh: 0 };
   return prepared;
 }
 
-/* the page is as wide as the screen; at first only a book-sized part of it is visible */
+/* the miniature slide has the screen's shape and sits centred on the right-hand page */
 function configure(p) {
   const vw = innerWidth, vh = innerHeight;
   if (p.vw === vw && p.vh === vh) return;
   p.vw = vw; p.vh = vh;
-  p.Wl = Math.round(p.H * vw / vh);
-  p.page.style.width = p.Wl + 'px';
-  p.page.style.clipPath = `inset(0px ${p.Wl - p.W}px 0px 0px)`;
-  p.live.style.cssText = `width:${vw}px;height:${vh}px;transform:scale(${p.Wl / vw});`;
+  p.sw = p.W * 0.84;                       // slide width on the page
+  p.sh = p.sw * vh / vw;
+  Object.assign(p.thumb.style, { width: p.sw + 'px', height: p.sh + 'px',
+                                 left: (p.W - p.sw) / 2 + 'px', top: (p.H - p.sh) / 2 + 'px' });
+  p.live.style.cssText = `width:${vw}px;height:${vh}px;transform:scale(${p.sw / vw});`;
 }
 
 let coolTimer;
@@ -179,15 +182,14 @@ async function openBook(t, btn, animate) {
   const p = prepare(t);
   configure(p);
   preloadViewer(t);
-  const { box, cover, page, W, H, T, Wl, vw, vh } = p;
+  const { box, cover, live, W, H, T, sw, vw, vh } = p;
 
   const r = btn.getBoundingClientRect();
   const lift = -new DOMMatrixReadOnly(getComputedStyle(btn).transform).m42 || 0;   // hover raise currently applied
   const cx = r.left + r.width / 2, cy = r.top + lift + r.height / 2;               // resting centre on the shelf
   const dx = vw / 2 - cx, dy = vh / 2 - cy;
-  const fit = Math.min(vw * 0.5 / W, vh * 0.78 / H);            // book "in front of the screen"
-  const fill = vw / Wl * 1.02;                                  // widened page fills the viewport
-  const dx3 = dx - fill * (Wl - W) / 2;                         // keep the *page* centred, not the cover
+  const fit = Math.min(vw * 0.44 / W, vh * 0.78 / H);           // the open book (two pages) fits the screen
+  const fill = vw / sw;                                         // the miniature slide fills the screen
 
   // Position/size and rotation are animated separately (CSS translate / scale / rotate),
   // so the book can be spine-on for the part of the trip that is near the shelf.
@@ -195,12 +197,14 @@ async function openBook(t, btn, animate) {
   const P0 = tr(-T / 2, 0, -W / 2);                             // spine exactly over the shelf book (resting)
   const Pr = tr(-T / 2, -lift, -W / 2);                         // ...as it is while hovered
   const Po = tr(-T / 2, -lift, -W / 2 + W * 0.9);               // slid straight out of the shelf
-  const P2 = tr(dx, dy, 0);                                     // centred in front of the screen
-  const P3 = tr(dx3, dy, 0);                                    // zoomed onto the first page
+  // the book is scaled in depth too, so push it back until the page sits exactly in the screen plane
+  const P2 = tr(dx, dy, -(T - 3) * fit);                        // centred in front of the screen
+  const Pb = tr(dx + fit * W / 2, dy, -(T - 3) * fit);         // open: the two-page spread is centred
+  const P3 = tr(dx, dy, -(T - 3) * fill);                       // zoomed into the slide (it sits at the page centre)
 
   box.style.left = (cx - W / 2) + 'px';
   box.style.top = (cy - H / 2) + 'px';
-  Object.assign(box.style, { transform: 'none', translate: Pr, rotate: 'y 90deg', scale: '1' });
+  Object.assign(box.style, { transform: 'none', translate: Pr, rotate: 'y 90deg', scale: '1 1 1' });
   stage.style.perspectiveOrigin = `${cx}px ${cy}px`;            // look straight at the spine, like the flat book
   stage.classList.add('on');
   btn.style.visibility = 'hidden';
@@ -211,9 +215,9 @@ async function openBook(t, btn, animate) {
   // Played in reverse on close: the book turns away first, travels spine-on, and slides straight in.
   const DA = 1400, s1 = 0.3, r1 = s1 + 0.5 * (1 - s1), seg = 'cubic-bezier(.45,0,.25,1)';
   const A = play(box, [
-    { translate: Pr, scale: '1', easing: 'ease-in-out' },
-    { translate: Po, scale: '1', easing: seg, offset: s1 },
-    { translate: P2, scale: `${fit}` },
+    { translate: Pr, scale: '1 1 1', easing: 'ease-in-out' },
+    { translate: Po, scale: '1 1 1', easing: seg, offset: s1 },
+    { translate: P2, scale: `${fit} ${fit} ${fit}` },
   ], { duration: DA });
   const Ar = play(box, [
     { rotate: 'y 90deg' },
@@ -231,14 +235,17 @@ async function openBook(t, btn, animate) {
   current.anims = [A, Abd];
   await done(A);
 
-  const cz = `translateZ(${T}px)`;
-  const B = play(box, [{ translate: P2, scale: `${fit}` }, { translate: P3, scale: `${fill}` }], { duration: 1000, easing: ease });
-  const Bc = play(cover, [{ transform: `${cz} rotateY(0deg)` }, { transform: `${cz} rotateY(-168deg)` }],
-                  { duration: 800, easing: 'ease-in-out' });
-  const Bp = play(page, [{ clipPath: `inset(0px ${Wl - W}px 0px 0px)` }, { clipPath: 'inset(0px 0px 0px 0px)' }],
-                  { duration: 1000, easing: ease });
-  current.anims.push(B, Bc, Bp);
-  await done(B);
+  // open the book fully, pause on the spread, then zoom into the small slide
+  const cz = `translateZ(${T}px)`, S = s => `${s} ${s} ${s}`;
+  const Bo = play(box, [{ translate: P2, scale: S(fit) }, { translate: Pb, scale: S(fit) }], { duration: 900, easing: 'ease-in-out' });
+  const Bc = play(cover, [{ transform: `${cz} rotateY(0deg)` }, { transform: `${cz} rotateY(-180deg)` }],
+                  { duration: 900, easing: 'ease-in-out' });
+  current.anims.push(Bo, Bc);
+  await done(Bo);
+  await sleep(350);
+  const Bz = play(box, [{ translate: Pb, scale: S(fit) }, { translate: P3, scale: S(fill) }], { duration: 1100, easing: ease });
+  current.anims.push(Bz);
+  await done(Bz);
 
   await Promise.race([viewerReady, sleep(1500)]);               // never show an unloaded viewer
   showViewer(t);
@@ -261,12 +268,18 @@ async function closeBook() {
     return;
   }
 
+  // the miniature on the book's page shows the slide you were on (messages also work on file://)
+  if (current.slide && prepared) prepared.live.contentWindow.postMessage({ type: 'goto', name: current.slide }, '*');
   stage.classList.add('on');
-  await sleep(360);                           // let the viewer fade out
-  const [A, Abd, B, Bc, Bp] = anims;
-  B.reverse(); Bc.reverse(); Bp.reverse();
-  await done(B);
-  B.cancel(); Bc.cancel(); Bp.cancel();
+  await sleep(380);                           // let the viewer fade out
+  const [A, Abd, Bo, Bc, Bz] = anims;
+  Bz.reverse();
+  await done(Bz);
+  Bz.cancel();
+  await sleep(300);
+  Bo.reverse(); Bc.reverse();
+  await done(Bo);
+  Bo.cancel(); Bc.cancel();
   A.reverse(); Abd.reverse(); current.ar.reverse(); current.apo.reverse();
   await done(A);
   if (lift > 0.5) await done(play(box, [{ translate: Pr }, { translate: P0 }], { duration: 160, easing: 'ease-out' }));
@@ -289,7 +302,11 @@ function finishClose(btn) {
 /* ---------- controls ---------- */
 $('back').addEventListener('click', closeBook);
 addEventListener('keydown', e => { if (e.key === 'Escape') closeBook(); });
-addEventListener('message', e => { if (e.source === frame.contentWindow && e.data === 'close-book') closeBook(); });
+addEventListener('message', e => {
+  if (e.source !== frame.contentWindow) return;
+  if (e.data === 'close-book') closeBook();
+  else if (e.data && e.data.type === 'slide' && current) current.slide = e.data.name;   // remember the open slide
+});
 
 /* ---------- deep link: index.html#scheduling opens straight away ---------- */
 function fromHash() {

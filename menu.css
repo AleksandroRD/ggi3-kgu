@@ -64,15 +64,19 @@ body.open{overflow:hidden}
 /* ---------- 3D overlay ---------- */
 #stage{position:fixed;inset:0;z-index:20;perspective:1800px;pointer-events:none;visibility:hidden}
 #stage.on{visibility:visible;pointer-events:auto}
-#stage .backdrop{position:absolute;inset:0;background:rgba(20,14,6,.55)}
+#stage .backdrop{position:absolute;inset:0;background:rgba(20,14,6,.55);opacity:0}
 #stage .box{position:absolute;left:0;top:0;transform-style:preserve-3d;will-change:transform}
 .box > *{position:absolute;top:0;left:0}
-.box .spine{transform-origin:left center;transform:rotateY(-90deg)}
+.box .spine{transform-origin:left center;transform:rotateY(-90deg);border-radius:0}
+.box .cover-front,.box .cover-back{border-radius:0}  /* rounded corners let the white page peek through */
 .box .page{
   width:100%;height:100%;background:#fff;overflow:hidden;
   box-shadow:inset 8px 0 14px -8px rgba(0,0,0,.25);
 }
-.box .page iframe{position:absolute;top:0;left:0;border:0;transform-origin:0 0;pointer-events:none;background:#fff}
+.box .page{background:#fffdf8}
+.box .thumb{position:absolute;overflow:hidden;background:#fff;
+  box-shadow:0 0 0 .5px rgba(0,0,0,.18), 0 1px 3px rgba(0,0,0,.12)}
+.box .thumb iframe{position:absolute;top:0;left:0;border:0;transform-origin:0 0;pointer-events:none;background:#fff}
 .box .backcover{width:100%;height:100%;background:var(--c);filter:brightness(.7)}
 .box .cover{width:100%;height:100%;transform-origin:left center;transform-style:preserve-3d}
 .box .cover > div{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
@@ -86,7 +90,11 @@ body.open{overflow:hidden}
 .cover-front .chip::after{content:"";position:absolute;inset:22%;background:#fff;border-radius:18%}
 .cover-front h2{margin:0;font-size:clamp(14px,2.2vw,30px);line-height:1.08;letter-spacing:-.01em;font-size:calc(var(--W) * .11)}
 .cover-front p{margin:.6em 0 0;font-family:var(--mono);opacity:.85;font-size:calc(var(--W) * .042)}
-.cover-back{background:#fffdf8;transform:rotateY(180deg);box-shadow:inset -8px 0 14px -8px rgba(0,0,0,.25)}
+.cover-back{background:#fffdf8;transform:rotateY(180deg);box-shadow:inset -8px 0 14px -8px rgba(0,0,0,.25);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 12%;color:var(--text)}
+.cover-back h3{margin:0;font-size:calc(var(--W) * .085);line-height:1.1;letter-spacing:-.01em}
+.cover-back p{margin:.7em 0 0;font-family:var(--mono);color:var(--muted);font-size:calc(var(--W) * .036)}
+.cover-back::after{content:"";width:22%;height:2px;background:var(--c);margin-top:1.2em;order:-1;margin:0 0 1.2em}
 
 /* ---------- presentation viewer ---------- */
 #viewer{
