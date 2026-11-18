@@ -130,6 +130,11 @@
   [data-name=tradeoffs] .sx li{margin:10px 0}
   [data-name=tradeoffs] .lead{font-size:clamp(17px,1.5vw,22px)}
   @media (max-width:900px){.sx,[data-name=fcfs-info] .sx{grid-template-columns:1fr}}
+  .bg-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;background:#fff;z-index:0;pointer-events:none}
+  [data-name=fcfs-info] > :not(canvas){position:relative;z-index:1}
+  [data-name=fcfs-info] .sx{grid-template-columns:1fr;max-width:58%}
+  [data-name=fcfs-info] .card{background:rgba(255,255,255,.92)}
+  @media (max-width:900px){[data-name=fcfs-info] .sx{max-width:100%}}
 
   /* slide 3 */
   .s3-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-bottom:14px}
@@ -270,6 +275,7 @@
 
   <!-- ============ SLIDE: FCFS OVERVIEW ============ -->
   <section class="slide" data-name="fcfs-info">
+    <canvas id="paper" class="bg-canvas"></canvas>
     <h2>FCFS at a glance</h2>
     <p class="lead muted" style="margin:0 0 18px">The simplest scheduler there is: whoever arrives first gets the CPU first. It works like a single checkout line in a shop.</p>
     <div class="sx">
@@ -509,6 +515,97 @@ function showInfo(k){
 }
 document.querySelectorAll('#sd .node, #sd .edge').forEach(g => g.addEventListener('click', () => showInfo(g.dataset.k)));
 showInfo('dispatch');
+
+/* ================= SLIDE 3: newspaper queue (top view) ================= */
+const PCOLS = ['#0f9d8f','#e0486a','#6f58e0','#d98200','#3a7bd5','#d93c3c'];
+const paper = { people:[], spawnIn:0.3, n:0, W:0, H:0 };
+function paperGeom(W, H){
+  const colX = W - 150, counterY = H - 150;
+  return { colX, counterY, frontY: counterY - 50, gap: 52 };
+}
+function paperStep(dt){
+  const cv = document.getElementById('paper');
+  const f = fitCanvas(cv); if (!f) return;
+  const { W, H } = f; paper.W = W; paper.H = H;
+  const g = paperGeom(W, H), P = paper.people;
+  const inLine = P.filter(p => p.st !== 'leaving');
+  const maxQ = Math.max(2, Math.floor((g.frontY + 10) / g.gap));
+  paper.spawnIn -= dt;
+  if (paper.spawnIn <= 0 && inLine.length < maxQ){
+    P.push({ id: ++paper.n, x: g.colX, y: -16, st:'queue', t:0, need: 2.2 + Math.random() * 1.2,
+             col: PCOLS[paper.n % PCOLS.length] });
+    paper.spawnIn = 1.7 + Math.random() * 0.8;
+  }
+  inLine.forEach((p, i) => {                 // queue order = array order
+    const ty = g.frontY - i * g.gap;
+    const d = ty - p.y;
+    p.y += Math.sign(d) * Math.min(Math.abs(d), 80 * dt);
+    p.x = g.colX;
+    if (i === 0 && p.st === 'queue' && Math.abs(d) < 0.5) p.st = 'serving';
+    if (p.st === 'serving'){
+      p.t += dt;
+      if (p.t >= p.need){ p.st = 'leaving'; }
+    }
+  });
+  paper.people = P.filter(p => !(p.st === 'leaving' && p.x < -20));
+  paper.people.forEach(p => { if (p.st === 'leaving') p.x -= 120 * dt; });
+  // keep leavers out of the queue ordering but still drawn
+  paper.people.sort((a, b) => (a.st === 'leaving') - (b.st === 'leaving') || a.id - b.id);
+  drawPaper();
+}
+function paperIcon(ctx, x, y){   // newspaper centred at x,y, 24x17 with text lines
+  ctx.fillStyle = '#fff'; ctx.strokeStyle = '#55627c'; ctx.lineWidth = 1;
+  rr(ctx, x - 12, y - 8.5, 24, 17, 3); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#55627c'; ctx.fillRect(x - 9, y - 6, 18, 2.5);        // headline
+  ctx.fillStyle = '#8591a8';
+  for (let i = 0; i < 3; i++){ ctx.fillRect(x - 9, y - 1 + i * 3.5, 8, 1.2); ctx.fillRect(x + 1, y - 1 + i * 3.5, 8, 1.2); }
+}
+function drawPaper(){
+  const cv = document.getElementById('paper');
+  const f = fitCanvas(cv); if (!f) return;
+  const { ctx, W, H } = f;
+  const g = paperGeom(W, H);
+  ctx.clearRect(0, 0, W, H);
+  // kiosk counter
+  const kw = 200, kx = g.colX - kw / 2;
+  ctx.fillStyle = '#c9ab7a'; rr(ctx, kx, g.counterY, kw, 46, 8); ctx.fill();
+  ctx.fillStyle = '#b48f5c'; ctx.fillRect(kx + 8, g.counterY + 8, kw - 16, 4);
+  // newspapers on the counter
+  [[-62, 0], [-38, 3]].forEach(([dx, dy]) => {
+    paperIcon(ctx, g.colX + dx, g.counterY + 28 + dy);
+  });
+  // seller (behind the counter)
+  ctx.fillStyle = '#1a2233'; ctx.beginPath(); ctx.arc(g.colX, g.counterY + 78, 24, 0, 7); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = '600 14px "Space Grotesk", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('CPU', g.colX, g.counterY + 78);
+  // people
+  paper.people.forEach(p => {
+    const r = 20;
+    ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.beginPath(); ctx.arc(p.x + 2, p.y + 3, r, 0, 7); ctx.fill();
+    ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.fill();
+    if (p.st === 'serving'){
+      ctx.strokeStyle = '#1a2233'; ctx.lineWidth = 3; ctx.beginPath();
+      const u = Math.min(1, p.t / p.need), ease = v => v * v * (3 - 2 * v);
+      ctx.arc(p.x, p.y, r + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * u); ctx.stroke();
+      const sy = g.counterY + 78, hx = g.colX - 38, hy = g.counterY + 28;
+      if (u > .05 && u < .4){                      // pays: dollar goes to the seller
+        const k = ease((u - .05) / .3), dy = p.y + (sy - p.y) * k;
+        ctx.fillStyle = '#2e9e5b'; ctx.strokeStyle = '#1f7a43'; ctx.lineWidth = 1;
+        rr(ctx, p.x - 13, dy - 8, 26, 16, 3); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#fff'; ctx.font = '700 12px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('$', p.x, dy + .5);
+      }
+      if (u >= .5){                                // takes a newspaper from the counter
+        const k = ease(Math.min(1, (u - .5) / .35));
+        paperIcon(ctx, hx + (p.x - hx) * k, hy + (p.y - r - 6 - hy) * k);
+      }
+    }
+    if (p.st === 'leaving'){
+      paperIcon(ctx, p.x, p.y - r - 6);
+    }
+  });
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+}
 
 /* ================= SLIDE 3: FCFS simulation ================= */
 const cv = document.getElementById('fcfs');
@@ -794,7 +891,7 @@ function drawGantt(ctx, W){
 }
 
 /* ================= MAIN LOOP ================= */
-function resizeAll(){ if (names[cur] === 'fcfs') draw(); if (names[cur] === 'intro') drawTimeline(.06); }
+function resizeAll(){ if (names[cur] === 'fcfs') draw(); if (names[cur] === 'intro') drawTimeline(.06); if (names[cur] === 'fcfs-info') drawPaper(); }
 window.addEventListener('resize', resizeAll);
 
 let last = performance.now(), lastTable = 0;
@@ -802,6 +899,7 @@ function frame(now){
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
   const name = names[cur];
   if (name === 'intro') demoStep(dt);
+  if (name === 'fcfs-info') paperStep(dt);
   if (name === 'fcfs'){
     if (!paused){ simAdvance(dt * cfg.speed); S.beltOff += dt * 26; }
     if (!paused || now < S.animUntil) updateVisuals(dt);
