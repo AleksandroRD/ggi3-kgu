@@ -6,190 +6,7 @@
 <title>Process Scheduling — Interactive Lesson</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --bg:#ffffff; --panel:#ffffff; --panel2:#f4f4f2; --line:#e5e5e2; --line2:#d0d0cc;
-    --text:#1a2233; --muted:#55627c; --dim:#8591a8;
-    --accent:#d98200; --accent-soft:rgba(217,130,0,.12);
-    --teal:#0f9d8f; --pink:#e0486a; --violet:#6f58e0; --red:#d93c3c;
-    --mono:'JetBrains Mono', ui-monospace, monospace;
-    --sans:'Space Grotesk', system-ui, sans-serif;
-  }
-  *{box-sizing:border-box}
-  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:var(--sans)}
-  body{display:flex;flex-direction:column;overflow:hidden;
-    background:
-      radial-gradient(1200px 600px at 85% -10%, rgba(217,130,0,.07), transparent 60%),
-      radial-gradient(900px 500px at -10% 110%, rgba(15,157,143,.06), transparent 60%),
-      var(--bg);}
-  button{font-family:inherit}
-
-  /* top bar */
-  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;flex:none}
-  .brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:.02em}
-  .brand .chip{width:22px;height:22px;border:2px solid var(--accent);border-radius:5px;position:relative}
-  .brand .chip::after{content:"";position:absolute;inset:4px;background:var(--accent);border-radius:2px}
-  .brand small{color:var(--muted);font-weight:400;margin-left:6px}
-  .counter{font-family:var(--mono);font-size:13px;color:var(--muted)}
-
-  /* slides */
-  main{flex:1;position:relative;overflow:hidden}
-  .slide{position:absolute;inset:0;padding:30px 44px 24px;overflow:auto;opacity:0;visibility:hidden;transform:translateX(24px);transition:opacity .35s ease, transform .35s ease, visibility .35s}
-  .slide.active{opacity:1;visibility:visible;transform:none}
-  h1{font-size:clamp(34px,4.6vw,60px);line-height:1.02;margin:0 0 18px;letter-spacing:-.02em}
-  h2{font-size:clamp(26px,3vw,38px);margin:0 0 8px;letter-spacing:-.015em}
-  .lead{font-size:clamp(16px,1.35vw,20px);line-height:1.55;color:#34405a;max-width:60ch}
-  .muted{color:var(--muted)}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px}
-  em.hl{font-style:normal;color:var(--accent)}
-
-  /* slide 1 */
-  .s1{display:grid;grid-template-columns:1.05fr 1fr;gap:44px;align-items:center;min-height:100%}
-  .analogy{margin-top:26px;padding:18px 20px;display:flex;gap:16px;align-items:flex-start;max-width:60ch}
-  .analogy .ico{flex:none;width:40px;height:40px;border-radius:10px;background:var(--accent-soft);display:grid;place-items:center;color:var(--accent);font-weight:700}
-  .analogy p{margin:0;line-height:1.5;color:#34405a}
-  .questions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
-  .questions span{font-size:14px;padding:7px 12px;border:1px solid var(--line2);border-radius:999px;color:#34405a}
-  .demo{padding:22px}
-  .demo h3{margin:0 0 4px;font-size:15px;font-weight:600}
-  .demo .sub{font-size:13px;color:var(--muted);margin-bottom:14px}
-  .app{display:grid;grid-template-columns:78px 1fr 44px;gap:12px;align-items:center;margin:10px 0;font-size:14px}
-  .bar{height:12px;border-radius:6px;background:var(--panel2);overflow:hidden;border:1px solid var(--line)}
-  .bar i{display:block;height:100%;width:0;border-radius:6px}
-  .app b{font-family:var(--mono);font-weight:500;font-size:12px;color:var(--muted);text-align:right}
-  .app.on span{color:var(--text)}
-  .app span{color:var(--muted);transition:color .1s}
-  .divider{height:1px;background:var(--line);margin:18px 0}
-  .tl-wrap{position:relative}
-  #tl{width:100%;height:46px;display:block;border-radius:8px;background:var(--panel2);border:1px solid var(--line)}
-  .demo-foot{display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:10px;flex-wrap:wrap}
-  .now{font-family:var(--mono);font-size:13px;color:var(--muted)}
-  .now b{color:var(--text)}
-
-  .btn{border:1px solid var(--line2);background:var(--panel2);color:var(--text);padding:8px 14px;border-radius:9px;font-size:14px;cursor:pointer;transition:background .15s,border-color .15s}
-  .btn:hover{border-color:var(--accent)}
-  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
-  .btn.primary:hover{filter:brightness(1.06)}
-  .btn:disabled{opacity:.35;cursor:default}
-
-  /* slide 2 */
-  .s2{display:grid;grid-template-columns:1.5fr 1fr;gap:30px;align-items:center}
-  .s2 .info{margin-top:0;padding:20px 22px;min-height:160px}
-  .s2 .info p{font-size:16.5px}
-  .diagram{padding:16px}
-  .diagram svg{width:100%;height:auto;display:block}
-  .node rect{fill:var(--panel2);stroke:var(--line2);stroke-width:1.5;transition:stroke .2s, fill .2s}
-  .node text{fill:var(--text);font-family:var(--sans);font-size:15px;font-weight:600;text-anchor:middle;dominant-baseline:middle;pointer-events:none}
-  .node,.edge{cursor:pointer}
-  .node:hover rect,.node.sel rect{stroke:var(--accent)}
-  .node.sel rect{fill:#fff3df}
-  .edge path.vis{fill:none;stroke:var(--dim);stroke-width:2;transition:stroke .2s}
-  .edge path.hit{fill:none;stroke:transparent;stroke-width:16}
-  .edge text{fill:var(--muted);font-family:var(--mono);font-size:11px;text-anchor:middle;transition:fill .2s}
-  .edge:hover path.vis,.edge.sel path.vis{stroke:var(--accent)}
-  .edge:hover text,.edge.sel text{fill:var(--accent)}
-  .edge.key path.vis{stroke:var(--accent);stroke-width:2.5;stroke-dasharray:6 5;animation:dash 1.2s linear infinite}
-  .edge.key text{fill:var(--accent)}
-  @keyframes dash{to{stroke-dashoffset:-22}}
-  .info{margin-top:12px;padding:14px 16px;min-height:86px;background:var(--panel2);border-radius:10px;border:1px solid var(--line)}
-  .info b{color:var(--accent)}
-  .info p{margin:4px 0 0;line-height:1.5;font-size:15px;color:#34405a}
-  .metrics{display:grid;gap:12px}
-  .metrics.m5{grid-template-columns:repeat(5,1fr)}
-  .metrics.m3{grid-template-columns:repeat(3,1fr)}
-  .mgroup{margin:16px 0 8px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-weight:600}
-  [data-name=metrics] .metric{padding:16px 18px}
-  [data-name=metrics] .metric h4{font-size:clamp(16px,1.4vw,19px);margin-bottom:6px}
-  [data-name=metrics] .metric p{font-size:clamp(13.5px,1.1vw,15px)}
-  .goal{display:inline-block;margin:8px 0 0 8px;font-family:var(--mono);font-size:11px;color:var(--dim);border:1px solid var(--line2);border-radius:5px;padding:2px 6px}
-  .goal.up{color:var(--teal);border-color:rgba(15,157,143,.4)} .goal.down{color:var(--accent);border-color:rgba(217,130,0,.45)}
-  .metric code+.goal{margin-left:6px}
-  @media (max-width:1100px){.metrics.m5{grid-template-columns:repeat(2,1fr)}.metrics.m3{grid-template-columns:1fr}.s2{grid-template-columns:1fr}}
-  .metric{padding:12px 14px}
-  .metric h4{margin:0 0 4px;font-size:15px}
-  .metric p{margin:0;font-size:13.5px;line-height:1.45;color:var(--muted)}
-  .metric code{display:inline-block;margin-top:6px;font-family:var(--mono);font-size:12px;color:var(--teal);background:rgba(15,157,143,.08);padding:3px 7px;border-radius:6px}
-  .metric.cs{border-color:rgba(217,130,0,.45)}
-  .metric.cs h4{color:var(--accent)}
-
-  /* slide FCFS overview */
-  .sx{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
-  .sx .card{padding:16px 18px}
-  .sx h4{margin:0 0 8px;font-size:15px}
-  .sx ul{margin:0;padding-left:18px;line-height:1.55;color:#34405a;font-size:14.5px}
-  .sx li{margin:3px 0}
-  .pros h4{color:var(--teal)} .cons h4{color:var(--red)}
-  .steps{counter-reset:s;list-style:none;padding:0!important}
-  .steps li{counter-increment:s;display:flex;gap:10px;align-items:flex-start}
-  .steps li::before{content:counter(s);flex:none;width:22px;height:22px;border-radius:6px;background:var(--accent-soft);color:var(--accent);font-family:var(--mono);font-weight:700;font-size:12px;display:grid;place-items:center;margin-top:1px}
-  .gantt{display:flex;height:34px;border-radius:7px;overflow:hidden;font-family:var(--mono);font-size:12px;color:#fff;font-weight:700;margin:8px 0 4px}
-  .gantt div{display:grid;place-items:center;border-right:2px solid #fff}
-  .gantt-t{display:flex;font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:12px}
-  .ex-label{font-size:13px;color:var(--muted);margin-top:6px}
-  .ex-res{font-family:var(--mono);font-size:13px;color:var(--text)}
-  .ex-res b{color:var(--accent)}
-  [data-name=fcfs-info] .sx{grid-template-columns:1.25fr 1fr;gap:24px}
-  [data-name=fcfs-info] .sx .card:first-child{padding:28px 32px}
-  [data-name=fcfs-info] .sx .card:first-child h4{font-size:clamp(20px,2vw,28px);margin-bottom:16px}
-  [data-name=fcfs-info] .sx .card:first-child ul{font-size:clamp(16px,1.5vw,21px);line-height:1.55}
-  [data-name=fcfs-info] .sx .card:first-child li{margin:12px 0;gap:14px}
-  [data-name=fcfs-info] .sx .card:first-child li::before{width:30px;height:30px;font-size:15px;border-radius:8px}
-  [data-name=fcfs-info] .sx .card:first-child .tag{font-size:13px;padding:6px 11px}
-  [data-name=tradeoffs] .sx{gap:28px}
-  [data-name=tradeoffs] .sx .card{padding:30px 34px}
-  [data-name=tradeoffs] .sx h4{font-size:clamp(22px,2.2vw,30px);margin-bottom:16px}
-  [data-name=tradeoffs] .sx ul{font-size:clamp(17px,1.6vw,22px);line-height:1.6;padding-left:24px}
-  [data-name=tradeoffs] .sx li{margin:10px 0}
-  [data-name=tradeoffs] .lead{font-size:clamp(17px,1.5vw,22px)}
-  @media (max-width:900px){.sx,[data-name=fcfs-info] .sx{grid-template-columns:1fr}}
-  .bg-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;background:#fff;z-index:0;pointer-events:none}
-  [data-name=fcfs-info] > :not(canvas){position:relative;z-index:1}
-  [data-name=fcfs-info] .sx{grid-template-columns:1fr;max-width:58%}
-  [data-name=fcfs-info] .card{background:rgba(255,255,255,.92)}
-  @media (max-width:900px){[data-name=fcfs-info] .sx{max-width:100%}}
-
-  /* slide 3 */
-  .s3-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-bottom:14px}
-  .s3-head p{margin:0;color:#34405a;max-width:72ch;line-height:1.5}
-  .tags{display:flex;gap:8px;flex-wrap:wrap}
-  .tag{font-family:var(--mono);font-size:11.5px;padding:5px 9px;border-radius:6px;border:1px solid var(--line2);color:var(--muted)}
-  .s3{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;max-width:980px;margin:0 auto}
-  .stage{padding:10px 10px 6px;position:relative}
-  #fcfs{width:100%;height:340px;display:block}
-  .paused-badge{position:absolute;top:16px;right:18px;font-family:var(--mono);font-size:12px;padding:4px 10px;border-radius:6px;background:var(--red);color:#fff;font-weight:700;letter-spacing:.08em;display:none}
-  .stage.paused .paused-badge{display:block}
-  .controls{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
-  .controls .group{display:flex;gap:8px;align-items:center}
-  .ctl{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);min-width:130px}
-  .ctl label{display:flex;justify-content:space-between;gap:8px}
-  .ctl label b{font-family:var(--mono);color:var(--text);font-weight:500}
-  input[type=range]{accent-color:var(--accent);width:100%}
-  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-  .stat{padding:9px 11px}
-  .stat .k{font-size:11.5px;color:var(--muted);line-height:1.2}
-  .stat .v{font-family:var(--mono);font-size:19px;font-weight:700;margin-top:3px}
-  .stat .u{font-size:11px;color:var(--dim);font-weight:400;margin-left:3px}
-  .stat.hl{border-color:rgba(217,130,0,.45);background:linear-gradient(180deg,rgba(217,130,0,.08),transparent)}
-  .stat.hl .v{color:var(--accent)}
-  .notes{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
-  .note{padding:10px 12px;font-size:13px;line-height:1.45;color:#34405a}
-  .note b{color:var(--text)}
-
-  /* nav */
-  .nav{flex:none;display:flex;align-items:center;justify-content:center;gap:16px;padding:12px}
-  .dots{display:flex;gap:8px}
-  .dots button{width:30px;height:6px;border-radius:3px;border:0;background:var(--line2);cursor:pointer;padding:0}
-  .dots button.on{background:var(--accent)}
-  .hint{position:absolute;right:24px;font-size:12px;color:var(--dim);font-family:var(--mono)}
-
-  @media (max-width: 1000px){
-    .s1,.s2,.s3{grid-template-columns:1fr}
-    .slide{padding:22px 18px}
-    .notes{grid-template-columns:1fr}
-    .hint{display:none}
-    body{overflow:auto}
-  }
-</style>
+<link rel="stylesheet" href="scheduling.css">
 </head>
 <body>
 
@@ -277,7 +94,7 @@
   <!-- ============ SLIDE: FCFS OVERVIEW ============ -->
   <section class="slide" data-name="fcfs-info">
     <canvas id="paper" class="bg-canvas"></canvas>
-    <h2>FCFS at a glance</h2>
+    <h2>First-Come, First-Served at a glance</h2>
     <p class="lead muted" style="margin:0 0 18px">The simplest scheduler there is: whoever arrives first gets the CPU first. It works like a single checkout line in a shop.</p>
     <div class="sx">
       <div class="card">
@@ -297,7 +114,6 @@
     <div class="s3-head">
       <div>
         <h2>First-Come, First-Served <span class="muted" style="font-weight:400">(FCFS / FIFO)</span></h2>
-        <p>Processes run in arrival order and keep the CPU until they finish.</p>
       </div>
     </div>
 
@@ -310,11 +126,14 @@
         <button class="btn primary" id="playBtn" style="min-width:92px">Pause</button>
         <button class="btn" id="resetBtn">Reset</button>
         <button class="btn" id="longBtn" title="Adds a process with burst 18">+ Long process</button>
+        <div class="ctl" style="min-width:200px"><label>Arrival speed <b id="rateVal">1.0×</b></label><input type="range" id="rateSlider" min="0.2" max="3" step="0.1" value="1"></div>
       </div>
       <div class="stats">
         <div class="stat card"><div class="k">Avg waiting</div><div class="v" id="mW">-</div></div>
         <div class="stat card"><div class="k">Avg turnaround</div><div class="v" id="mTA">-</div></div>
-        <div class="stat card hl"><div class="k">Context switches</div><div class="v" id="mCS">0</div></div>
+        <div class="stat card"><div class="k">Completed</div><div class="v" id="mDone">0</div></div>
+        <div class="stat card"><div class="k">Context switches</div><div class="v" id="mCS">0</div></div>
+        <div class="stat card hl"><div class="k">Overhead</div><div class="v" id="mOH">0%</div></div>
       </div>
     </div>
   </section>
@@ -322,22 +141,311 @@
   <!-- ============ SLIDE 5: PROS & CONS ============ -->
   <section class="slide" data-name="tradeoffs">
     <h2>FCFS: strengths and weaknesses</h2>
-    <p class="lead muted" style="margin:0 0 18px">Simple and predictable, but not always efficient.</p>
+    <p class="lead muted" style="margin:0 0 18px">Simple and predictable, but not efficient</p>
     <div class="sx">
       <div class="card pros">
         <h4>Strengths</h4>
         <ul>
-          <li>Very simple to implement and to reason about.</li>
-          <li>Fair in the sense of order: nobody is overtaken, so no process starves.</li>
+          <li>Very simple to implement.</li>
+          <li>Process starvation is not possible.</li>
           <li>Minimal overhead: one context switch per process.</li>
         </ul>
       </div>
       <div class="card cons">
         <h4>Weaknesses</h4>
         <ul>
-          <li>Average waiting time can be very high and depends on arrival order.</li>
+          <li>Average waiting time are very high</li>
           <li>Convoy effect: short jobs get stuck behind one long job.</li>
-          <li>Poor for interactive systems, since there is no time slicing and responsiveness suffers.</li>
+          <li>Poor for interactive systems, because of terible responsiveness.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SLIDE: SJF OVERVIEW ============ -->
+  <section class="slide" data-name="sjf-info">
+    <canvas id="checkout" class="bg-canvas"></canvas>
+    <h2>Shortest-Job-First at a glance</h2>
+    <p class="lead muted" style="margin:0 0 18px">Think of the express lane in a supermarket: whoever has the smallest basket gets served first, even if they joined the line later.</p>
+    <div class="sx">
+      <div class="card">
+        <h4>How it works</h4>
+        <ul class="steps">
+          <li><span>Every process in the <b>ready queue</b> has a <b>burst time</b>, the size of its basket.</span></li>
+          <li><span>When the CPU is free, the scheduler picks the process with the <b>shortest</b> burst, not the oldest.</span></li>
+          <li><span>That process runs until it <b>finishes</b>. Nobody can interrupt it (non-preemptive).</span></li>
+          <li><span>If two processes tie, the one that arrived first goes first.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SLIDE: SJF SIMULATION ============ -->
+  <section class="slide" data-name="sjf">
+    <div class="s3-head">
+      <div>
+        <h2>Shortest-Job-First <span class="muted" style="font-weight:400">(SJF)</span></h2>
+      </div>
+    </div>
+
+    <div class="s3">
+      <div class="stage card" id="stageJ">
+        <canvas id="fcfsJ"></canvas>
+        <div class="paused-badge">PAUSED</div>
+      </div>
+      <div class="controls">
+        <button class="btn primary" id="playBtnJ" style="min-width:92px">Pause</button>
+        <button class="btn" id="resetBtnJ">Reset</button>
+        <button class="btn" id="shortBtnJ" title="Adds a process with burst 1-2">+ Short process</button>
+        <button class="btn" id="longBtnJ" title="Adds a process with burst 18">+ Long process</button>
+        <div class="ctl" style="min-width:200px"><label>Arrival speed <b id="rateValJ">1.0×</b></label><input type="range" id="rateSliderJ" min="0.2" max="3" step="0.1" value="1"></div>
+      </div>
+      <div class="stats">
+        <div class="stat card"><div class="k">Avg waiting</div><div class="v" id="mWJ">-</div></div>
+        <div class="stat card"><div class="k">Avg turnaround</div><div class="v" id="mTAJ">-</div></div>
+        <div class="stat card"><div class="k">Completed</div><div class="v" id="mDoneJ">0</div></div>
+        <div class="stat card"><div class="k">Context switches</div><div class="v" id="mCSJ">0</div></div>
+        <div class="stat card hl"><div class="k">Overhead</div><div class="v" id="mOHJ">0%</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SLIDE: SJF PROS & CONS ============ -->
+  <section class="slide" data-name="sjf-tradeoffs">
+    <h2>SJF: strengths and weaknesses</h2>
+    <p class="lead muted" style="margin:0 0 18px">Fast on average, but unfair to long jobs</p>
+    <div class="sx">
+      <div class="card pros">
+        <h4>Strengths</h4>
+        <ul>
+          <li>Gives the lowest possible average waiting time for a non-preemptive algorithm.</li>
+          <li>Short jobs finish quickly, so the system feels responsive.</li>
+          <li>Higher throughput: more processes complete per unit of time.</li>
+        </ul>
+      </div>
+      <div class="card cons">
+        <h4>Weaknesses</h4>
+        <ul>
+          <li>Starvation: a long job can wait forever while shorter jobs keep arriving.</li>
+          <li>Burst time must be known in advance. In practice it can only be predicted from past behaviour.</li>
+          <li>Still non-preemptive: a long job that is already running blocks everyone (the preemptive version is called SRTF).</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+  <!-- ============ SLIDE: PRIORITY OVERVIEW ============ -->
+  <section class="slide" data-name="prio-info">
+    <canvas id="er" class="bg-canvas"></canvas>
+    <h2>Priority Scheduling at a glance</h2>
+    <p class="lead muted" style="margin:0 0 18px">Think of a hospital emergency room: the patient in the worst condition is treated first, no matter who arrived earlier.</p>
+    <div class="sx">
+      <div class="card">
+        <h4>How it works</h4>
+        <ul class="steps">
+          <li><span>Every process gets a <b>priority number</b>. Here <b>1 is the highest</b> and 4 the lowest.</span></li>
+          <li><span>When the CPU is free, the scheduler picks the ready process with the <b>highest priority</b>.</span></li>
+          <li><span>Processes with the same priority are served in <b>FCFS</b> order.</span></li>
+          <li><span>The running process is not interrupted (non-preemptive version).</span></li>
+        </ul>
+        <div class="prio-legend"><span style="background:#d93c3c">P1 critical</span><span style="background:#e8730c">P2 urgent</span><span style="background:#d4a300">P3 normal</span><span style="background:#2e9e5b">P4 low</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SLIDE: PRIORITY SIMULATION ============ -->
+  <section class="slide" data-name="prio">
+    <div class="s3-head">
+      <div>
+        <h2>Priority Scheduling</h2>
+      </div>
+    </div>
+
+    <div class="s3">
+      <div class="stage card" id="stageP">
+        <canvas id="fcfsP"></canvas>
+        <div class="paused-badge">PAUSED</div>
+      </div>
+      <div class="controls">
+        <button class="btn primary" id="playBtnP" style="min-width:92px">Pause</button>
+        <button class="btn" id="resetBtnP">Reset</button>
+        <button class="btn" id="hiBtnP" title="Adds a priority-1 process">+ High priority</button>
+        <button class="btn" id="loBtnP" title="Adds a priority-4 process">+ Low priority</button>
+        <button class="btn" id="agingBtnP" title="Waiting processes slowly gain priority">Aging: off</button>
+        <div class="ctl" style="min-width:200px"><label>Arrival speed <b id="rateValP">1.0×</b></label><input type="range" id="rateSliderP" min="0.2" max="3" step="0.1" value="1"></div>
+      </div>
+      <div class="stats">
+        <div class="stat card"><div class="k">Avg waiting</div><div class="v" id="mWP">-</div></div>
+        <div class="stat card"><div class="k">Avg turnaround</div><div class="v" id="mTAP">-</div></div>
+        <div class="stat card"><div class="k">Completed</div><div class="v" id="mDoneP">0</div></div>
+        <div class="stat card"><div class="k">Context switches</div><div class="v" id="mCSP">0</div></div>
+        <div class="stat card hl"><div class="k">Overhead</div><div class="v" id="mOHP">0%</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SLIDE: PRIORITY PROS & CONS ============ -->
+  <section class="slide" data-name="prio-tradeoffs">
+    <h2>Priority Scheduling: strengths and weaknesses</h2>
+    <p class="lead muted" style="margin:0 0 18px">Important work goes first, but low priority can wait forever</p>
+    <div class="sx">
+      <div class="card pros">
+        <h4>Strengths</h4>
+        <ul>
+          <li>Critical and time-sensitive processes get the CPU first.</li>
+          <li>Flexible: priority can reflect importance, deadlines or resources.</li>
+          <li>Widely used in real operating systems (e.g. system tasks over background jobs).</li>
+        </ul>
+      </div>
+      <div class="card cons">
+        <h4>Weaknesses</h4>
+        <ul>
+          <li>Starvation: low-priority processes may never run while high-priority ones keep arriving.</li>
+          <li>Fix: <b>aging</b>, slowly raising the priority of processes that wait a long time.</li>
+          <li>Priority alone ignores burst time, so average waiting time can be worse than SJF.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+  <!-- ============ SLIDE: ROUND ROBIN OVERVIEW ============ -->
+  <section class="slide" data-name="rr-info">
+    <canvas id="rrcv" class="bg-canvas"></canvas>
+    <h2>Round Robin at a glance</h2>
+    <p class="lead muted" style="margin:0 0 18px">Think of friends sharing one game console: everyone plays for a fixed turn, and whoever is not finished goes to the back of the line.</p>
+    <div class="sx">
+      <div class="card">
+        <h4>How it works</h4>
+        <ul class="steps">
+          <li><span>The ready queue is a plain <b>FIFO</b> line, like in FCFS.</span></li>
+          <li><span>The first process runs for at most one <b>time quantum</b> (a fixed slice of CPU time).</span></li>
+          <li><span>If it is not finished when the quantum ends, it is <b>preempted</b> and goes to the back of the queue.</span></li>
+          <li><span>Then the next process gets its turn, so everyone gets the CPU regularly.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SLIDE: ROUND ROBIN SIMULATION ============ -->
+  <section class="slide" data-name="rr">
+    <div class="s3-head">
+      <div>
+        <h2>Round Robin <span class="muted" style="font-weight:400">(RR)</span></h2>
+        <p>Each process gets the CPU for at most one <b>time quantum</b>. If it is not finished, it goes to the back of the queue and the next one runs. Like taking turns on a shared game console.</p>
+      </div>
+    </div>
+
+    <div class="s3">
+      <div class="stage card" id="stageR">
+        <canvas id="fcfsR"></canvas>
+        <div class="paused-badge">PAUSED</div>
+      </div>
+      <div class="controls">
+        <button class="btn primary" id="playBtnR" style="min-width:92px">Pause</button>
+        <button class="btn" id="resetBtnR">Reset</button>
+        <button class="btn" id="longBtnR" title="Adds a process with burst 18">+ Long process</button>
+        <div class="ctl" style="min-width:200px"><label>Time quantum <b id="quantumValR">4 ms</b></label><input type="range" id="quantumSliderR" min="1" max="10" step="1" value="4"></div>
+        <div class="ctl" style="min-width:200px"><label>Arrival speed <b id="rateValR">1.0×</b></label><input type="range" id="rateSliderR" min="0.2" max="3" step="0.1" value="1"></div>
+      </div>
+      <div class="stats">
+        <div class="stat card"><div class="k">Avg waiting</div><div class="v" id="mWR">-</div></div>
+        <div class="stat card"><div class="k">Avg turnaround</div><div class="v" id="mTAR">-</div></div>
+        <div class="stat card"><div class="k">Completed</div><div class="v" id="mDoneR">0</div></div>
+        <div class="stat card"><div class="k">Context switches</div><div class="v" id="mCSR">0</div></div>
+        <div class="stat card hl"><div class="k">Overhead</div><div class="v" id="mOHR">0%</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SLIDE: ROUND ROBIN PROS & CONS ============ -->
+  <section class="slide" data-name="rr-tradeoffs">
+    <h2>Round Robin: strengths and weaknesses</h2>
+    <p class="lead muted" style="margin:0 0 18px">Fair and responsive, but it pays for it in context switches</p>
+    <div class="sx">
+      <div class="card pros">
+        <h4>Strengths</h4>
+        <ul>
+          <li>Fair: every process gets the CPU regularly, so starvation is not possible.</li>
+          <li>Good response time, which suits interactive and time-sharing systems.</li>
+          <li>Simple to implement, and short jobs are not stuck behind a long one for long.</li>
+        </ul>
+      </div>
+      <div class="card cons">
+        <h4>Weaknesses</h4>
+        <ul>
+          <li>Many context switches add overhead, especially with a small quantum.</li>
+          <li>The quantum is hard to choose: too large behaves like FCFS, too small wastes time on switching.</li>
+          <li>Average waiting and turnaround time are often higher than in SJF.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+  <!-- ============ SLIDE: CFS OVERVIEW ============ -->
+  <section class="slide" data-name="cfs-info">
+    <canvas id="cfscv" class="bg-canvas"></canvas>
+    <h2>Completely Fair Scheduler at a glance</h2>
+    <p class="lead muted" style="margin:0 0 18px">Think of a teacher who always helps the student who has received the least attention so far. Nobody is left waiting for long.</p>
+    <div class="sx">
+      <div class="card">
+        <h4>How it works</h4>
+        <ul class="steps">
+          <li><span>Each process tracks its <b>vruntime</b>: the CPU time it has received, scaled by its weight.</span></li>
+          <li><span>The scheduler always runs the process with the <b>smallest vruntime</b> (the leftmost node of a red-black tree).</span></li>
+          <li><span>It runs for a slice of the target latency, split by weight, then goes back into the tree with a larger vruntime.</span></li>
+          <li><span>A <b>lower nice value</b> means a higher weight: vruntime grows slower, so that process gets more CPU.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SLIDE: CFS SIMULATION ============ -->
+  <section class="slide" data-name="cfs">
+    <div class="s3-head">
+      <div>
+        <h2>Completely Fair Scheduler <span class="muted" style="font-weight:400">(CFS)</span></h2>
+        <p>The process with the smallest <b>vruntime</b> runs next. The queue is sorted by vruntime, so the leftmost box (closest to the CPU) is always next. Badges show each process's nice value; lower nice means more CPU share.</p>
+      </div>
+    </div>
+
+    <div class="s3">
+      <div class="stage card" id="stageC">
+        <canvas id="fcfsC"></canvas>
+        <div class="paused-badge">PAUSED</div>
+      </div>
+      <div class="controls">
+        <button class="btn primary" id="playBtnC" style="min-width:92px">Pause</button>
+        <button class="btn" id="resetBtnC">Reset</button>
+        <button class="btn" id="hiBtnC" title="Adds a process with nice -5 (high weight)">+ High weight (nice −5)</button>
+        <button class="btn" id="loBtnC" title="Adds a process with nice +5 (low weight)">+ Low weight (nice +5)</button>
+        <div class="ctl" style="min-width:200px"><label>Arrival speed <b id="rateValC">1.0×</b></label><input type="range" id="rateSliderC" min="0.2" max="3" step="0.1" value="1"></div>
+      </div>
+      <div class="stats">
+        <div class="stat card"><div class="k">Avg waiting</div><div class="v" id="mWC">-</div></div>
+        <div class="stat card"><div class="k">Avg turnaround</div><div class="v" id="mTAC">-</div></div>
+        <div class="stat card"><div class="k">Completed</div><div class="v" id="mDoneC">0</div></div>
+        <div class="stat card"><div class="k">Context switches</div><div class="v" id="mCSC">0</div></div>
+        <div class="stat card hl"><div class="k">Overhead</div><div class="v" id="mOHC">0%</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SLIDE: CFS PROS & CONS ============ -->
+  <section class="slide" data-name="cfs-tradeoffs">
+    <h2>CFS: strengths and weaknesses</h2>
+    <p class="lead muted" style="margin:0 0 18px">The Linux default for normal processes since kernel 2.6.23</p>
+    <div class="sx">
+      <div class="card pros">
+        <h4>Strengths</h4>
+        <ul>
+          <li>Fair: CPU share is proportional to weight, and nobody starves.</li>
+          <li>Needs no fixed quantum: the slice adapts to the number of running processes.</li>
+          <li>Scales well: picking the next process in a red-black tree takes O(log n).</li>
+        </ul>
+      </div>
+      <div class="card cons">
+        <h4>Weaknesses</h4>
+        <ul>
+          <li>More complex than the classic algorithms.</li>
+          <li>No hard real-time guarantees, so Linux uses separate real-time classes.</li>
+          <li>With many processes the slices get tiny, so a minimum granularity is needed to limit context switches.</li>
         </ul>
       </div>
     </div>
@@ -351,523 +459,6 @@
   <span class="hint">← → to navigate · space = pause</span>
 </nav>
 
-<script>
-(() => {
-/* ================= NAVIGATION ================= */
-const slides = [...document.querySelectorAll('.slide')];
-const names = slides.map(s => s.dataset.name);
-const dots = document.getElementById('dots');
-let cur = -1;
-slides.forEach((s, i) => {
-  const b = document.createElement('button');
-  b.title = s.querySelector('h1,h2').textContent.replace(/\s+/g,' ').trim();
-  b.onclick = () => go(i);
-  dots.appendChild(b);
-});
-function go(i){
-  i = Math.max(0, Math.min(slides.length - 1, i));
-  if (i === cur) return;
-  cur = i;
-  slides.forEach((s, k) => s.classList.toggle('active', k === i));
-  [...dots.children].forEach((d, k) => d.classList.toggle('on', k === i));
-  document.getElementById('prev').disabled = i === 0;
-  document.getElementById('next').disabled = i === slides.length - 1;
-  document.getElementById('counter').textContent = (i + 1) + ' / ' + slides.length;
-  if (location.hash.slice(1) !== names[i]) { try { location.hash = names[i]; } catch(e){} }
-  requestAnimationFrame(resizeAll);
-}
-document.getElementById('prev').onclick = () => go(cur - 1);
-document.getElementById('next').onclick = () => go(cur + 1);
-window.addEventListener('hashchange', () => { const k = names.indexOf(location.hash.slice(1)); if (k >= 0) go(k); });
-window.addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT') return;
-  if (e.key === 'ArrowRight' || e.key === 'PageDown') go(cur + 1);
-  else if (e.key === 'ArrowLeft' || e.key === 'PageUp') go(cur - 1);
-  else if (e.key === ' ' && names[cur] === 'fcfs') { e.preventDefault(); togglePause(); }
-});
-
-/* canvas helper */
-function fitCanvas(cv){
-  const r = cv.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  if (r.width === 0) return null;
-  const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
-  if (cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; }
-  const ctx = cv.getContext('2d');
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { ctx, W: r.width, H: r.height };
-}
-function rr(ctx, x, y, w, h, r){
-  ctx.beginPath();
-  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
-}
-
-/* ================= SLIDE 1: time-sharing demo ================= */
-const apps = [
-  { n:'System', c:'#0f9d8f', p:12 },
-  { n:'Firefox',   c:'#e0486a', p:47 },
-  { n:'VSCode',  c:'#6f58e0', p:78 },
-];
-const appsEl = document.getElementById('apps');
-apps.forEach(a => {
-  const row = document.createElement('div');
-  row.className = 'app';
-  row.innerHTML = `<span>${a.n}</span><div class="bar"><i style="background:${a.c}"></i></div><b>0%</b>`;
-  appsEl.appendChild(row);
-  a.row = row; a.fill = row.querySelector('i'); a.pct = row.querySelector('b');
-});
-const demo = { cur:0, left:0.06, slow:false, hist:[{a:0, d:0}] };
-const slowBtn = document.getElementById('slowBtn');
-slowBtn.onclick = () => {
-  demo.slow = !demo.slow;
-  slowBtn.textContent = demo.slow ? 'Back to real speed' : 'Slow down time';
-};
-function demoStep(rawDt){
-  const q = 0.06;
-  const dt = rawDt * (demo.slow ? 0.06 : 2);   // slow-motion = same simulation, slower clock
-  demo.left -= dt;
-  if (demo.left <= 0){
-    demo.cur = (demo.cur + 1) % apps.length;
-    demo.left = q;
-    demo.hist.push({a:demo.cur, d:0});
-    if (demo.hist.length > 400) demo.hist.splice(0, 200);
-  }
-  demo.hist[demo.hist.length - 1].d += dt;
-  const a = apps[demo.cur];
-  a.p = (a.p + dt * 33) % 100;
-  apps.forEach((x, i) => {
-    x.fill.style.width = x.p.toFixed(1) + '%';
-    x.pct.textContent = Math.floor(x.p) + '%';
-    x.row.classList.toggle('on', i === demo.cur);
-  });
-  document.getElementById('nowRun').textContent = a.n;
-  document.getElementById('nowRun').style.color = a.c;
-  drawTimeline(q);
-}
-function drawTimeline(q){
-  const f = fitCanvas(document.getElementById('tl')); if (!f) return;
-  const { ctx, W, H } = f;
-  ctx.clearRect(0, 0, W, H);
-  const win = q * 24;
-  let x = W;
-  for (let i = demo.hist.length - 1; i >= 0 && x > 0; i--){
-    const s = demo.hist[i]; const w = s.d / win * W;
-    x -= w;
-    ctx.fillStyle = apps[s.a].c;
-    ctx.globalAlpha = i === demo.hist.length - 1 ? 1 : 0.8;
-    ctx.fillRect(x, 8, Math.max(w - 1, 0.5), H - 16);
-    if (w > 46){
-      ctx.globalAlpha = 1; ctx.fillStyle = '#fff';
-      ctx.font = '600 11px "Space Grotesk", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(apps[s.a].n, x + w / 2, H / 2);
-    }
-  }
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = '#1a2233'; ctx.fillRect(W - 2, 4, 2, H - 8);
-}
-
-/* ================= SLIDE 2: state diagram ================= */
-const INFO = {
-  new:     ['New', 'The process is being created: the OS allocates memory and a Process Control Block (PCB).'],
-  ready:   ['Ready', 'The process has everything it needs except the CPU. It waits in the <b>ready queue</b>. This is the queue the scheduler picks from.'],
-  running: ['Running', 'The process is executing instructions on the CPU. On a single core, only one process can be in this state at a time.'],
-  waiting: ['Waiting (blocked)', 'The process is waiting for something other than the CPU, such as disk, network or keyboard input. It cannot run even if the CPU is free.'],
-  term:    ['Terminated', 'The process has finished. The OS frees its resources.'],
-  admit:   ['admitted', 'The OS accepts the new process and puts it in the ready queue.'],
-  dispatch:['dispatch: the scheduler\'s decision', 'The scheduler picks one process from the ready queue and gives it the CPU. A <b>context switch</b> loads that process\'s saved state. <b>Which</b> process gets picked is exactly what a scheduling algorithm decides.'],
-  preempt: ['interrupt / time slice over', 'In <b>preemptive</b> algorithms the OS can take the CPU away, for example when a time slice ends, and send the process back to Ready. FCFS never does this.'],
-  io:      ['I/O wait', 'The process asks for I/O (reading a file, say) and gives up the CPU voluntarily while it waits.'],
-  iodone:  ['I/O done', 'The I/O finishes. The process does not run immediately. It goes back to the ready queue.'],
-  exit:    ['exit', 'The process finishes its work and leaves the system.'],
-};
-const infoEl = document.getElementById('info');
-function showInfo(k){
-  document.querySelectorAll('#sd .node, #sd .edge').forEach(g => g.classList.toggle('sel', g.dataset.k === k));
-  infoEl.innerHTML = `<b>${INFO[k][0]}</b><p>${INFO[k][1]}</p>`;
-}
-document.querySelectorAll('#sd .node, #sd .edge').forEach(g => g.addEventListener('click', () => showInfo(g.dataset.k)));
-showInfo('dispatch');
-
-/* ================= SLIDE 3: newspaper queue (top view) ================= */
-const PCOLS = ['#0f9d8f','#e0486a','#6f58e0','#d98200','#3a7bd5','#d93c3c'];
-const paper = { people:[], spawnIn:0.3, n:0, W:0, H:0 };
-function paperGeom(W, H){
-  const colX = W - 150, counterY = H - 150;
-  return { colX, counterY, frontY: counterY - 50, gap: 52 };
-}
-function paperStep(dt){
-  const cv = document.getElementById('paper');
-  const f = fitCanvas(cv); if (!f) return;
-  const { W, H } = f; paper.W = W; paper.H = H;
-  const g = paperGeom(W, H), P = paper.people;
-  const inLine = P.filter(p => p.st !== 'leaving');
-  const maxQ = Math.max(2, Math.floor((g.frontY + 10) / g.gap));
-  paper.spawnIn -= dt;
-  if (paper.spawnIn <= 0 && inLine.length < maxQ){
-    P.push({ id: ++paper.n, x: g.colX, y: -16, st:'queue', t:0, need: 2.2 + Math.random() * 1.2,
-             col: PCOLS[paper.n % PCOLS.length] });
-    paper.spawnIn = 1.7 + Math.random() * 0.8;
-  }
-  inLine.forEach((p, i) => {                 // queue order = array order
-    const ty = g.frontY - i * g.gap;
-    const d = ty - p.y;
-    p.y += Math.sign(d) * Math.min(Math.abs(d), 80 * dt);
-    p.x = g.colX;
-    if (i === 0 && p.st === 'queue' && Math.abs(d) < 0.5) p.st = 'serving';
-    if (p.st === 'serving'){
-      p.t += dt;
-      if (p.t >= p.need){ p.st = 'leaving'; }
-    }
-  });
-  paper.people = P.filter(p => !(p.st === 'leaving' && p.x < -20));
-  paper.people.forEach(p => { if (p.st === 'leaving') p.x -= 120 * dt; });
-  // keep leavers out of the queue ordering but still drawn
-  paper.people.sort((a, b) => (a.st === 'leaving') - (b.st === 'leaving') || a.id - b.id);
-  drawPaper();
-}
-function paperIcon(ctx, x, y){   // newspaper centred at x,y, 24x17 with text lines
-  ctx.fillStyle = '#fff'; ctx.strokeStyle = '#55627c'; ctx.lineWidth = 1;
-  rr(ctx, x - 12, y - 8.5, 24, 17, 3); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = '#55627c'; ctx.fillRect(x - 9, y - 6, 18, 2.5);        // headline
-  ctx.fillStyle = '#8591a8';
-  for (let i = 0; i < 3; i++){ ctx.fillRect(x - 9, y - 1 + i * 3.5, 8, 1.2); ctx.fillRect(x + 1, y - 1 + i * 3.5, 8, 1.2); }
-}
-function drawPaper(){
-  const cv = document.getElementById('paper');
-  const f = fitCanvas(cv); if (!f) return;
-  const { ctx, W, H } = f;
-  const g = paperGeom(W, H);
-  ctx.clearRect(0, 0, W, H);
-  // kiosk counter
-  const kw = 200, kx = g.colX - kw / 2;
-  ctx.fillStyle = '#c9ab7a'; rr(ctx, kx, g.counterY, kw, 46, 8); ctx.fill();
-  ctx.fillStyle = '#b48f5c'; ctx.fillRect(kx + 8, g.counterY + 8, kw - 16, 4);
-  // newspapers on the counter
-  [[-62, 0], [-38, 3]].forEach(([dx, dy]) => {
-    paperIcon(ctx, g.colX + dx, g.counterY + 28 + dy);
-  });
-  // seller (behind the counter)
-  ctx.fillStyle = '#1a2233'; ctx.beginPath(); ctx.arc(g.colX, g.counterY + 78, 24, 0, 7); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.font = '600 14px "Space Grotesk", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('CPU', g.colX, g.counterY + 78);
-  // people
-  paper.people.forEach(p => {
-    const r = 20;
-    ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.beginPath(); ctx.arc(p.x + 2, p.y + 3, r, 0, 7); ctx.fill();
-    ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.fill();
-    if (p.st === 'serving'){
-      ctx.strokeStyle = '#1a2233'; ctx.lineWidth = 3; ctx.beginPath();
-      const u = Math.min(1, p.t / p.need), ease = v => v * v * (3 - 2 * v);
-      ctx.arc(p.x, p.y, r + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * u); ctx.stroke();
-      const sy = g.counterY + 78, hx = g.colX - 38, hy = g.counterY + 28;
-      if (u > .05 && u < .4){                      // pays: dollar goes to the seller
-        const k = ease((u - .05) / .3), dy = p.y + (sy - p.y) * k;
-        ctx.fillStyle = '#2e9e5b'; ctx.strokeStyle = '#1f7a43'; ctx.lineWidth = 1;
-        rr(ctx, p.x - 13, dy - 8, 26, 16, 3); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = '#fff'; ctx.font = '700 12px "JetBrains Mono", monospace';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('$', p.x, dy + .5);
-      }
-      if (u >= .5){                                // takes a newspaper from the counter
-        const k = ease(Math.min(1, (u - .5) / .35));
-        paperIcon(ctx, hx + (p.x - hx) * k, hy + (p.y - r - 6 - hy) * k);
-      }
-    }
-    if (p.st === 'leaving'){
-      paperIcon(ctx, p.x, p.y - r - 6);
-    }
-  });
-  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-}
-
-/* ================= SLIDE 3: FCFS simulation ================= */
-const cv = document.getElementById('fcfs');
-const stageEl = document.getElementById('stage');
-const MAXQ = 5;
-const cfg = { speed:2, rate:0.16, cs:0.3 };
-let S;
-const NAMES = ['System','Chrome','WhatsApp','Spotify','VS Code','Terminal','Slack','Zoom','Discord','Steam','Firefox','Telegram','Outlook','Word','Excel','Photoshop','Docker','Finder','Notes','Updater'];
-const nameOf = pid => NAMES[(pid - 1) % NAMES.length];
-const fitText = (ctx, t, maxW) => { if (ctx.measureText(t).width <= maxW) return t; while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1); return t + '…'; };
-const color = pid => `hsl(${(pid * 67) % 360} 68% 50%)`;
-const randBurst = () => 2 + Math.floor(Math.random() * 7);          // 2..8
-const expRand = () => -Math.log(1 - Math.random()) / cfg.rate;
-
-function resetSim(){
-  S = { t:0, nextPid:1, queue:[], cpu:null, mode:'idle', csLeft:0, done:[], vis:[],
-        completed:0, sumWait:0, sumTurn:0, switches:0, busy:0, gantt:[], nextArrival:1.5,
-        beltOff:0, animUntil:0, dirty:true };
-  spawn(0, 5); spawn(0, 3); spawn(0, 7);
-}
-function spawn(at, burst){
-  if (S.queue.length >= MAXQ) return false;
-  const p = { pid:S.nextPid++, name:nameOf(S.nextPid - 1), arrival:at, burst, remaining:burst, start:null, finish:null,
-              color:color(S.nextPid - 1), x:null, y:-30, w:60, a:0, state:'ready' };
-  S.queue.push(p); S.vis.push(p); S.dirty = true;
-  return true;
-}
-function dispatch(t){
-  const p = S.queue.shift();
-  S.cpu = p; S.switches++; S.dirty = true;
-  if (cfg.cs > 0){ S.mode = 'cs'; S.csLeft = cfg.cs; p.state = 'cs'; S.gantt.push({cs:true, s:t, e:t}); }
-  else startRun(t);
-}
-function startRun(t){
-  const p = S.cpu; S.mode = 'run'; p.state = 'run'; p.start = t;
-  S.gantt.push({pid:p.pid, name:p.name, color:p.color, s:t, e:t}); S.dirty = true;
-}
-function finish(t){
-  const p = S.cpu;
-  p.finish = t; p.state = 'done'; p.remaining = 0;
-  p.wait = p.start - p.arrival; p.turn = t - p.arrival;
-  S.completed++; S.sumWait += p.wait; S.sumTurn += p.turn;
-  S.done.unshift(p); if (S.done.length > 3) S.done.pop();
-  S.cpu = null; S.mode = 'idle'; S.dirty = true;
-}
-function tick(h){
-  const end = S.t + h;
-  while (S.nextArrival <= end){ spawn(+S.nextArrival.toFixed(2), randBurst()); S.nextArrival += expRand(); }
-  if (S.mode === 'idle' && S.queue.length) dispatch(S.t);
-  const g = S.gantt[S.gantt.length - 1];
-  if (S.mode === 'cs'){
-    S.csLeft -= h; g.e = end;
-    if (S.csLeft <= 0){ g.e = end + S.csLeft; startRun(end + S.csLeft); }
-  } else if (S.mode === 'run'){
-    S.cpu.remaining -= h; S.busy += h; g.e = end;
-    if (S.cpu.remaining <= 0){ g.e = end + S.cpu.remaining; finish(end + S.cpu.remaining); }
-  }
-  S.t = end;
-  while (S.gantt.length && S.gantt[0].e < S.t - 60) S.gantt.shift();
-}
-function simAdvance(dtSim){
-  let left = dtSim;
-  while (left > 1e-9){ const h = Math.min(0.05, left); tick(h); left -= h; }
-}
-
-let paused = false;
-const playBtn = document.getElementById('playBtn');
-function togglePause(){
-  paused = !paused;
-  playBtn.textContent = paused ? 'Play' : 'Pause';
-  stageEl.classList.toggle('paused', paused);
-  renderTable();
-}
-playBtn.onclick = togglePause;
-document.getElementById('resetBtn').onclick = () => { resetSim(); renderTable(); };
-document.getElementById('longBtn').onclick = () => { spawn(+S.t.toFixed(2), 18); S.animUntil = performance.now() + 700; renderTable(); };
-/* ---- table & stats ---- */
-const $ = id => document.getElementById(id);
-const f1 = v => v.toFixed(1);
-function renderTable(){
-  S.dirty = false;
-  $('mW').innerHTML = S.completed ? f1(S.sumWait / S.completed) + '<span class="u">tu</span>' : '-';
-  $('mTA').innerHTML = S.completed ? f1(S.sumTurn / S.completed) + '<span class="u">tu</span>' : '-';
-  $('mCS').textContent = S.switches;
-}
-
-/* ---- drawing ---- */
-let L = {};
-function layout(W, H){
-  const cpuW = 132, trayW = 64;
-  const cpuX = W - cpuW - trayW - 22;
-  L = { W, H, cpuX, cpuW, cpuY:64, cpuH:150, cpuCx:cpuX + cpuW / 2, cpuCy:139,
-        beltL:16, beltR:cpuX - 12, beltY:166, boxH:44,
-        trayX:W - trayW - 8, trayW, ganttY:270, ganttH:36 };
-}
-function updateVisuals(dt){
-  const k = Math.min(1, dt * 7);
-  const n = S.queue.length;
-  const slot = Math.min(76, (L.beltR - L.beltL - 6) / Math.max(n, 1));
-  const bw = Math.max(26, Math.min(62, slot - 8));
-  S.queue.forEach((p, i) => {
-    const tx = L.beltR - slot * (i + 0.5), ty = L.beltY - L.boxH / 2 - 2;
-    if (p.x === null){ p.x = Math.max(L.beltL + bw / 2, tx); p.y = 10; }
-    p.x += (tx - p.x) * k; p.y += (ty - p.y) * k; p.w += (bw - p.w) * k;
-    p.a = Math.min(1, p.a + dt * 3);
-  });
-  if (S.cpu){
-    const p = S.cpu;
-    if (p.x === null){ p.x = L.beltR; p.y = L.beltY - L.boxH / 2 - 2; }
-    p.x += (L.cpuCx - p.x) * k; p.y += (L.cpuCy - 8 - p.y) * k; p.w += (78 - p.w) * k; p.a = 1;
-  }
-  S.vis.forEach(p => {
-    if (p.state !== 'done') return;
-    const tx = L.trayX + L.trayW / 2, ty = L.cpuCy + 40;
-    p.x += (tx - p.x) * k; p.y += (ty - p.y) * k; p.w += (40 - p.w) * k;
-    if (Math.abs(tx - p.x) < 6) p.a -= dt * 1.4;
-  });
-  S.vis = S.vis.filter(p => !(p.state === 'done' && p.a <= 0));
-}
-function drawBox(ctx, p, big){
-  if (p.x === null) return;
-  const w = p.w, h = big ? 52 : L.boxH * (p.state === 'done' ? 0.75 : 1);
-  ctx.globalAlpha = Math.max(0, p.a);
-  ctx.fillStyle = p.color;
-  rr(ctx, p.x - w / 2, p.y - h / 2, w, h, 8); ctx.fill();
-  ctx.fillStyle = 'rgba(0,0,0,.12)';
-  rr(ctx, p.x - w / 2, p.y + h / 2 - 12, w, 12, 0); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  const fs = w < 40 ? 9 : big ? 13 : 11;
-  ctx.font = `700 ${fs}px "JetBrains Mono", monospace`;
-  ctx.fillText(fitText(ctx, p.name, w - 6), p.x, p.y - 5);
-  if (w >= 40 && p.state !== 'done'){
-    ctx.font = '500 10px "JetBrains Mono", monospace';
-    ctx.fillText('b=' + p.burst, p.x, p.y + h / 2 - 6);
-  }
-  ctx.globalAlpha = 1;
-}
-function draw(){
-  const f = fitCanvas(cv); if (!f) return;
-  const { ctx, W, H } = f; layout(W, H);
-  ctx.clearRect(0, 0, W, H);
-
-  // labels
-  ctx.font = '500 11px "JetBrains Mono", monospace'; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
-  ctx.fillStyle = '#8591a8';
-  ctx.fillText('NEW ARRIVALS ↓', L.beltL, 18);
-
-  // belt (side view of a real conveyor: frame, legs, rubber belt with moving treads, spinning end rollers)
-  const bL = L.beltL, bR = L.beltR, bY = L.beltY, bH = 16, rad = bH / 2 + 3, cy = bY + bH / 2;
-  // legs + feet
-  ctx.fillStyle = '#9aa0ab';
-  for (let x = bL + 30; x < bR - 20; x += 96){
-    ctx.fillRect(x - 3, bY + bH + 6, 6, 40);
-    ctx.fillRect(x - 12, bY + bH + 44, 24, 4);
-  }
-  // steel side frame under the belt
-  ctx.fillStyle = '#b9bec7'; rr(ctx, bL + 4, bY + bH + 2, bR - bL - 8, 7, 2); ctx.fill();
-  ctx.fillStyle = '#9aa0ab'; ctx.fillRect(bL + 4, bY + bH + 7, bR - bL - 8, 2);
-  // belt body
-  ctx.save(); rr(ctx, bL, bY, bR - bL, bH, bH / 2); ctx.clip();
-  ctx.fillStyle = '#3d4351'; ctx.fillRect(bL, bY, bR - bL, bH);
-  const off = S.beltOff % 24;
-  ctx.fillStyle = '#566074';
-  for (let x = bL - 24 + off; x < bR + 24; x += 24) ctx.fillRect(x, bY + 3, 5, bH - 6);   // treads
-  ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fillRect(bL, bY, bR - bL, 2);              // top highlight
-  ctx.restore();
-  // end rollers
-  [bL + bH / 2, bR - bH / 2].forEach(x => {
-    ctx.fillStyle = '#9aa0ab'; ctx.beginPath(); ctx.arc(x, cy, rad, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#6f7683'; ctx.lineWidth = 1.5; ctx.stroke();
-    const ang = S.beltOff / rad;
-    ctx.strokeStyle = '#6f7683'; ctx.lineWidth = 2;
-    for (let k = 0; k < 3; k++){
-      const t = ang + k * Math.PI / 3;
-      ctx.beginPath(); ctx.moveTo(x - Math.cos(t) * (rad - 3), cy - Math.sin(t) * (rad - 3));
-      ctx.lineTo(x + Math.cos(t) * (rad - 3), cy + Math.sin(t) * (rad - 3)); ctx.stroke();
-    }
-    ctx.fillStyle = '#4a5060'; ctx.beginPath(); ctx.arc(x, cy, 3, 0, Math.PI * 2); ctx.fill();
-  });
-
-  // CPU body
-  const { cpuX, cpuY, cpuW, cpuH } = L;
-  const active = S.mode !== 'idle';
-  const csCol = '#d93c3c';
-  const edge = S.mode === 'cs' ? csCol : S.mode === 'run' ? '#d98200' : '#d0d0cc';
-  ctx.strokeStyle = '#d0d0cc'; ctx.lineWidth = 3;
-  for (let i = 0; i < 6; i++){
-    const x = cpuX + 16 + i * (cpuW - 32) / 5;
-    ctx.beginPath(); ctx.moveTo(x, cpuY - 10); ctx.lineTo(x, cpuY); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x, cpuY + cpuH); ctx.lineTo(x, cpuY + cpuH + 10); ctx.stroke();
-  }
-  ctx.fillStyle = '#f4f4f2'; rr(ctx, cpuX, cpuY, cpuW, cpuH, 14); ctx.fill();
-  ctx.lineWidth = 2; ctx.strokeStyle = edge; rr(ctx, cpuX, cpuY, cpuW, cpuH, 14); ctx.stroke();
-  if (active){ ctx.save(); ctx.shadowColor = edge; ctx.shadowBlur = 18; rr(ctx, cpuX, cpuY, cpuW, cpuH, 14); ctx.stroke(); ctx.restore(); }
-  ctx.fillStyle = '#55627c'; ctx.font = '700 12px "JetBrains Mono", monospace'; ctx.textAlign = 'center';
-  ctx.fillText('CPU', L.cpuCx, cpuY + 20);
-
-  // process boxes (queue + done), CPU process on top
-  S.vis.forEach(p => { if (p !== S.cpu) drawBox(ctx, p, false); });
-  if (S.cpu) drawBox(ctx, S.cpu, true);
-
-  // CPU status text
-  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-  if (S.mode === 'run'){
-    const p = S.cpu, frac = 1 - Math.max(p.remaining, 0) / p.burst;
-    const bx = cpuX + 16, bw = cpuW - 32, by = cpuY + cpuH - 30;
-    ctx.fillStyle = '#e5e5e2'; rr(ctx, bx, by, bw, 7, 3.5); ctx.fill();
-    ctx.fillStyle = '#d98200'; rr(ctx, bx, by, Math.max(7, bw * frac), 7, 3.5); ctx.fill();
-    ctx.fillStyle = '#55627c'; ctx.font = '500 10.5px "JetBrains Mono", monospace';
-    ctx.fillText(f1(Math.max(p.remaining, 0)) + ' / ' + p.burst + ' left', L.cpuCx, by + 20);
-  } else if (S.mode === 'cs'){
-    const blink = (Math.floor(performance.now() / 220) % 2) ? 1 : .55;
-    ctx.globalAlpha = paused ? 1 : blink;
-    ctx.fillStyle = csCol; ctx.font = '700 11px "JetBrains Mono", monospace';
-    ctx.fillText('CONTEXT', L.cpuCx, cpuY + cpuH - 28);
-    ctx.fillText('SWITCH', L.cpuCx, cpuY + cpuH - 14);
-    ctx.globalAlpha = 1;
-  } else {
-    ctx.fillStyle = '#8591a8'; ctx.font = '500 13px "JetBrains Mono", monospace';
-    ctx.fillText('idle', L.cpuCx, L.cpuCy + 4);
-  }
-
-  // done tray
-  ctx.strokeStyle = '#e5e5e2'; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5;
-  rr(ctx, L.trayX, L.cpuCy + 12, L.trayW, 56, 10); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle = '#8591a8'; ctx.font = '500 10.5px "JetBrains Mono", monospace';
-  ctx.fillText('DONE', L.trayX + L.trayW / 2, L.cpuCy + 84);
-  ctx.strokeStyle = '#d0d0cc'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(cpuX + cpuW + 4, L.cpuCy + 10); ctx.quadraticCurveTo(L.trayX + 10, L.cpuCy + 8, L.trayX + L.trayW / 2, L.cpuCy + 18); ctx.stroke();
-
-  drawGantt(ctx, W);
-}
-function drawGantt(ctx, W){
-  const x0 = 16, x1 = W - 16, y = L.ganttY, h = L.ganttH, win = 40;
-  const tEnd = Math.max(S.t, win), tStart = tEnd - win;
-  const X = t => x0 + (t - tStart) / win * (x1 - x0);
-  ctx.textAlign = 'left'; ctx.fillStyle = '#8591a8'; ctx.font = '500 11px "JetBrains Mono", monospace';
-  ctx.fillText('CPU TIMELINE', x0, y - 10);
-  ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#e5e5e2'; ctx.lineWidth = 1;
-  rr(ctx, x0, y, x1 - x0, h, 6); ctx.fill(); ctx.stroke();
-  ctx.save(); rr(ctx, x0, y, x1 - x0, h, 6); ctx.clip();
-  S.gantt.forEach(g => {
-    if (g.e < tStart) return;
-    const a = X(Math.max(g.s, tStart)), b = X(g.e), w = b - a;
-    if (g.cs){
-      ctx.fillStyle = 'rgba(217,60,60,.85)'; ctx.fillRect(a, y, Math.max(w, 1.5), h);
-    } else {
-      ctx.fillStyle = g.color; ctx.fillRect(a, y + 1, Math.max(w - 1, 0.5), h - 2);
-      if (w > 26){ ctx.fillStyle = '#fff'; ctx.font = '700 10px "JetBrains Mono", monospace'; ctx.textAlign = 'center';
-        ctx.fillText(fitText(ctx, g.name, w - 4), a + w / 2, y + h / 2 + 4); ctx.textAlign = 'left'; }
-    }
-  });
-  ctx.restore();
-  ctx.fillStyle = '#8591a8'; ctx.font = '500 10px "JetBrains Mono", monospace'; ctx.textAlign = 'center';
-  for (let t = Math.ceil(tStart / 5) * 5; t <= tEnd; t += 5){
-    const x = X(t); ctx.fillRect(x, y + h, 1, 4); ctx.fillText(t, x, y + h + 16);
-  }
-  // legend
-  ctx.textAlign = 'right';
-  ctx.fillStyle = 'rgba(217,60,60,.85)'; ctx.fillRect(x1 - 108, y - 20, 10, 10);
-  ctx.fillStyle = '#55627c'; ctx.fillText('context switch', x1, y - 11);
-  ctx.textAlign = 'left';
-}
-
-/* ================= MAIN LOOP ================= */
-function resizeAll(){ if (names[cur] === 'fcfs') draw(); if (names[cur] === 'intro') drawTimeline(.06); if (names[cur] === 'fcfs-info') drawPaper(); }
-window.addEventListener('resize', resizeAll);
-
-let last = performance.now(), lastTable = 0;
-function frame(now){
-  const dt = Math.min(0.1, (now - last) / 1000); last = now;
-  const name = names[cur];
-  if (name === 'intro') demoStep(dt);
-  if (name === 'fcfs-info') paperStep(dt);
-  if (name === 'fcfs'){
-    if (!paused){ simAdvance(dt * cfg.speed); S.beltOff += dt * 26; }
-    if (!paused || now < S.animUntil) updateVisuals(dt);
-    draw();
-    if (!paused && now - lastTable > 120){ renderTable(); lastTable = now; }
-  }
-  requestAnimationFrame(frame);
-}
-
-resetSim();
-renderTable();
-const startIdx = names.indexOf(location.hash.slice(1));
-go(startIdx >= 0 ? startIdx : 0);
-requestAnimationFrame(frame);
-})();
-</script>
+<script src="scheduling.js"></script>
 </body>
 </html>
