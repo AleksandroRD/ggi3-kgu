@@ -73,7 +73,9 @@
   .btn:disabled{opacity:.35;cursor:default}
 
   /* slide 2 */
-  .s2{display:grid;grid-template-columns:1.1fr 1fr;gap:34px;align-items:start}
+  .s2{display:grid;grid-template-columns:1.5fr 1fr;gap:30px;align-items:center}
+  .s2 .info{margin-top:0;padding:20px 22px;min-height:160px}
+  .s2 .info p{font-size:16.5px}
   .diagram{padding:16px}
   .diagram svg{width:100%;height:auto;display:block}
   .node rect{fill:var(--panel2);stroke:var(--line2);stroke-width:1.5;transition:stroke .2s, fill .2s}
@@ -92,7 +94,17 @@
   .info{margin-top:12px;padding:14px 16px;min-height:86px;background:var(--panel2);border-radius:10px;border:1px solid var(--line)}
   .info b{color:var(--accent)}
   .info p{margin:4px 0 0;line-height:1.5;font-size:15px;color:#34405a}
-  .metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .metrics{display:grid;gap:12px}
+  .metrics.m5{grid-template-columns:repeat(5,1fr)}
+  .metrics.m3{grid-template-columns:repeat(3,1fr)}
+  .mgroup{margin:16px 0 8px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-weight:600}
+  [data-name=metrics] .metric{padding:16px 18px}
+  [data-name=metrics] .metric h4{font-size:clamp(16px,1.4vw,19px);margin-bottom:6px}
+  [data-name=metrics] .metric p{font-size:clamp(13.5px,1.1vw,15px)}
+  .goal{display:inline-block;margin:8px 0 0 8px;font-family:var(--mono);font-size:11px;color:var(--dim);border:1px solid var(--line2);border-radius:5px;padding:2px 6px}
+  .goal.up{color:var(--teal);border-color:rgba(15,157,143,.4)} .goal.down{color:var(--accent);border-color:rgba(217,130,0,.45)}
+  .metric code+.goal{margin-left:6px}
+  @media (max-width:1100px){.metrics.m5{grid-template-columns:repeat(2,1fr)}.metrics.m3{grid-template-columns:1fr}.s2{grid-template-columns:1fr}}
   .metric{padding:12px 14px}
   .metric h4{margin:0 0 4px;font-size:15px}
   .metric p{margin:0;font-size:13.5px;line-height:1.45;color:var(--muted)}
@@ -141,45 +153,24 @@
   .s3-head p{margin:0;color:#34405a;max-width:72ch;line-height:1.5}
   .tags{display:flex;gap:8px;flex-wrap:wrap}
   .tag{font-family:var(--mono);font-size:11.5px;padding:5px 9px;border-radius:6px;border:1px solid var(--line2);color:var(--muted)}
-  .s3{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(320px,1fr);gap:18px;align-items:start}
+  .s3{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;max-width:980px;margin:0 auto}
   .stage{padding:10px 10px 6px;position:relative}
   #fcfs{width:100%;height:340px;display:block}
   .paused-badge{position:absolute;top:16px;right:18px;font-family:var(--mono);font-size:12px;padding:4px 10px;border-radius:6px;background:var(--red);color:#fff;font-weight:700;letter-spacing:.08em;display:none}
   .stage.paused .paused-badge{display:block}
-  .controls{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;padding:12px 14px;margin-top:12px}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
   .controls .group{display:flex;gap:8px;align-items:center}
   .ctl{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);min-width:130px}
   .ctl label{display:flex;justify-content:space-between;gap:8px}
   .ctl label b{font-family:var(--mono);color:var(--text);font-weight:500}
   input[type=range]{accent-color:var(--accent);width:100%}
-  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
   .stat{padding:9px 11px}
   .stat .k{font-size:11.5px;color:var(--muted);line-height:1.2}
   .stat .v{font-family:var(--mono);font-size:19px;font-weight:700;margin-top:3px}
   .stat .u{font-size:11px;color:var(--dim);font-weight:400;margin-left:3px}
   .stat.hl{border-color:rgba(217,130,0,.45);background:linear-gradient(180deg,rgba(217,130,0,.08),transparent)}
   .stat.hl .v{color:var(--accent)}
-  .tablecard{margin-top:10px;overflow:hidden}
-  .tablecard .th{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line);font-size:13px}
-  .tablecard .th span{color:var(--muted);font-family:var(--mono);font-size:12px}
-  .tscroll{overflow:auto}
-  table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px}
-  thead th{position:sticky;top:0;background:var(--panel);color:var(--muted);font-weight:500;text-align:right;padding:7px 10px;border-bottom:1px solid var(--line);font-size:11.5px}
-  thead th:first-child,tbody td:first-child{text-align:left}
-  tbody td{padding:6px 10px;text-align:right;border-bottom:1px solid rgba(208,208,204,.6)}
-  tr.sep td{background:var(--panel2);color:var(--muted);font-size:11px;text-align:left;letter-spacing:.08em;text-transform:uppercase;padding:5px 10px}
-  .pid{display:inline-flex;align-items:center;gap:7px}
-  .pid i{width:10px;height:10px;border-radius:3px;display:inline-block}
-  .ph{color:var(--dim)}
-  .ph-st{border-color:transparent!important}
-  table{table-layout:fixed}
-  tbody tr:not(.sep){height:31px}
-  tbody td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .st{display:inline-block;width:118px;text-align:center;box-sizing:border-box;font-size:11px;padding:2px 7px;border-radius:5px;border:1px solid var(--line2);color:var(--muted)}
-  .st.run{border-color:var(--accent);color:var(--accent)}
-  .st.cs{border-color:var(--red);color:var(--red)}
-  tr.donerow td{color:var(--muted)}
-  .warn{color:var(--red)}
   .notes{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
   .note{padding:10px 12px;font-size:13px;line-height:1.45;color:#34405a}
   .note b{color:var(--text)}
@@ -235,7 +226,7 @@
 
   <!-- ============ SLIDE 2 ============ -->
   <section class="slide" data-name="lifecycle">
-    <h2>The life of a process and how we measure scheduling</h2>
+    <h2>The life of a process</h2>
     <p class="lead muted" style="margin:0 0 18px">Click any state or arrow in the diagram. The scheduler acts at the highlighted arrow.</p>
     <div class="s2">
       <div>
@@ -257,19 +248,29 @@
             <g class="node" data-k="waiting"><rect x="256" y="242" width="110" height="44" rx="10"/><text x="311" y="264">Waiting</text></g>
             <g class="node" data-k="term"><rect x="500" y="38" width="120" height="44" rx="10"/><text x="560" y="60">Terminated</text></g>
           </svg>
-          <div class="info" id="info"></div>
         </div>
       </div>
-      <div class="metrics">
-        <div class="metric card"><h4>Arrival time</h4><p>When the process enters the ready queue.</p></div>
-        <div class="metric card"><h4>Burst time</h4><p>How much CPU time the process needs to finish.</p></div>
-        <div class="metric card"><h4>Waiting time</h4><p>Total time spent in the ready queue, not running.</p><code>turnaround − burst</code></div>
-        <div class="metric card"><h4>Turnaround time</h4><p>Total time from arrival to completion.</p><code>completion − arrival</code></div>
-        <div class="metric card"><h4>Response time</h4><p>Time until the process first gets the CPU.</p><code>first run − arrival</code></div>
-        <div class="metric card"><h4>Throughput</h4><p>How many processes finish per unit of time.</p><code>completed ÷ time</code></div>
-        <div class="metric card"><h4>CPU utilization</h4><p>Share of time the CPU does useful work.</p><code>busy time ÷ total time</code></div>
-        <div class="metric card cs"><h4>Context switch</h4><p>Saving one process's state (registers, PC…) and loading the next one's. Pure overhead: no useful work gets done during it.</p></div>
-      </div>
+      <div class="info" id="info"></div>
+    </div>
+  </section>
+
+  <!-- ============ SLIDE: METRICS ============ -->
+  <section class="slide" data-name="metrics">
+    <h2>How we measure scheduling</h2>
+    <p class="lead muted" style="margin:0 0 14px">These are the numbers used to compare scheduling algorithms.</p>
+    <h5 class="mgroup">Per process</h5>
+    <div class="metrics m5">
+        <div class="metric card"><h4>Arrival time</h4><p>When the process enters the ready queue.</p><span class="goal">input</span></div>
+        <div class="metric card"><h4>Burst time</h4><p>How much CPU time the process needs to finish.</p><span class="goal">input</span></div>
+        <div class="metric card"><h4>Waiting time</h4><p>Total time spent in the ready queue, not running.</p><code>turnaround − burst</code><span class="goal down">lower is better</span></div>
+        <div class="metric card"><h4>Turnaround time</h4><p>Total time from arrival to completion.</p><code>completion − arrival</code><span class="goal down">lower is better</span></div>
+        <div class="metric card"><h4>Response time</h4><p>Time until the process first gets the CPU.</p><code>first run − arrival</code><span class="goal down">lower is better</span></div>
+    </div>
+    <h5 class="mgroup">System-wide</h5>
+    <div class="metrics m3">
+        <div class="metric card"><h4>Throughput</h4><p>How many processes finish per unit of time.</p><code>completed ÷ time</code><span class="goal up">higher is better</span></div>
+        <div class="metric card"><h4>CPU utilization</h4><p>Share of time the CPU does useful work.</p><code>busy time ÷ total time</code><span class="goal up">higher is better</span></div>
+        <div class="metric card cs"><h4>Context switch</h4><p>Saving one process's state (registers, PC…) and loading the next one's. Pure overhead: no useful work gets done during it.</p><span class="goal down">lower is better</span></div>
     </div>
   </section>
 
@@ -296,52 +297,24 @@
     <div class="s3-head">
       <div>
         <h2>First-Come, First-Served <span class="muted" style="font-weight:400">(FCFS / FIFO)</span></h2>
-        <p>Processes get the CPU in the order they arrive, like a conveyor belt. Once a process is on the CPU it keeps it until it finishes. FCFS is <b>non-preemptive</b>.</p>
+        <p>Processes run in arrival order and keep the CPU until they finish.</p>
       </div>
     </div>
 
     <div class="s3">
-      <div>
-        <div class="stage card" id="stage">
-          <canvas id="fcfs"></canvas>
-          <div class="paused-badge">PAUSED</div>
-        </div>
-        <div class="controls card">
-          <div class="group">
-            <button class="btn primary" id="playBtn" style="min-width:92px">Pause</button>
-            <button class="btn" id="resetBtn">Reset</button>
-          </div>
-          <div class="group">
-            <button class="btn" id="addBtn">+ Process</button>
-            <button class="btn" id="longBtn" title="Adds a process with burst 18">+ Long process</button>
-          </div>
-          <div class="ctl"><label>Speed <b id="spdV">2 tu/s</b></label><input type="range" id="spd" min="0.5" max="8" step="0.5" value="2"></div>
-          <div class="ctl"><label>Arrivals / 10 tu <b id="rateV">1.6</b></label><input type="range" id="rate" min="0.4" max="3" step="0.1" value="1.6"></div>
-          <div class="ctl"><label>Switch cost <b id="csV">0.3 tu</b></label><input type="range" id="cs" min="0" max="1.5" step="0.1" value="0.3"></div>
-        </div>
+      <div class="stage card" id="stage">
+        <canvas id="fcfs"></canvas>
+        <div class="paused-badge">PAUSED</div>
       </div>
-
-      <div>
-        <div class="stats">
-          <div class="stat card"><div class="k">Time</div><div class="v" id="mT">0</div></div>
-          <div class="stat card"><div class="k">Completed</div><div class="v" id="mDone">0</div></div>
-          <div class="stat card"><div class="k">In ready queue</div><div class="v" id="mQ">0</div></div>
-          <div class="stat card"><div class="k">Avg waiting</div><div class="v" id="mW">-</div></div>
-          <div class="stat card"><div class="k">Avg turnaround</div><div class="v" id="mTA">-</div></div>
-          <div class="stat card"><div class="k">CPU utilization</div><div class="v" id="mU">-</div></div>
-          <div class="stat card hl"><div class="k">Context switches</div><div class="v" id="mCS">0</div></div>
-          <div class="stat card hl"><div class="k">Switches / process</div><div class="v" id="mCSP">-</div></div>
-          <div class="stat card hl"><div class="k">Switches / time unit</div><div class="v" id="mCST">-</div></div>
-        </div>
-        <div class="tablecard card">
-          <div class="tscroll">
-            <table>
-              <colgroup><col style="width:21%"><col style="width:12%"><col style="width:10%"><col style="width:13%"><col style="width:15%"><col></colgroup>
-              <thead><tr><th>PID</th><th>Arrival</th><th>Burst</th><th>Waited</th><th>Turnaround</th><th>Status</th></tr></thead>
-              <tbody id="tbody"></tbody>
-            </table>
-          </div>
-        </div>
+      <div class="controls">
+        <button class="btn primary" id="playBtn" style="min-width:92px">Pause</button>
+        <button class="btn" id="resetBtn">Reset</button>
+        <button class="btn" id="longBtn" title="Adds a process with burst 18">+ Long process</button>
+      </div>
+      <div class="stats">
+        <div class="stat card"><div class="k">Avg waiting</div><div class="v" id="mW">-</div></div>
+        <div class="stat card"><div class="k">Avg turnaround</div><div class="v" id="mTA">-</div></div>
+        <div class="stat card hl"><div class="k">Context switches</div><div class="v" id="mCS">0</div></div>
       </div>
     </div>
   </section>
@@ -452,7 +425,7 @@ slowBtn.onclick = () => {
 };
 function demoStep(rawDt){
   const q = 0.06;
-  const dt = rawDt * (demo.slow ? 0.06 : 1);   // slow-motion = same simulation, slower clock
+  const dt = rawDt * (demo.slow ? 0.06 : 2);   // slow-motion = same simulation, slower clock
   demo.left -= dt;
   if (demo.left <= 0){
     demo.cur = (demo.cur + 1) % apps.length;
@@ -681,54 +654,15 @@ function togglePause(){
 }
 playBtn.onclick = togglePause;
 document.getElementById('resetBtn').onclick = () => { resetSim(); renderTable(); };
-document.getElementById('addBtn').onclick = () => { spawn(+S.t.toFixed(2), randBurst()); S.animUntil = performance.now() + 700; renderTable(); };
 document.getElementById('longBtn').onclick = () => { spawn(+S.t.toFixed(2), 18); S.animUntil = performance.now() + 700; renderTable(); };
-const bind = (id, out, fn, fmt) => { const el = document.getElementById(id); const o = document.getElementById(out);
-  const upd = () => { fn(+el.value); o.textContent = fmt(+el.value); }; el.addEventListener('input', upd); upd(); };
-bind('spd', 'spdV', v => cfg.speed = v, v => v + ' tu/s');
-bind('rate', 'rateV', v => { cfg.rate = v / 10; if (S) S.nextArrival = Math.min(S.nextArrival, S.t + expRand()); }, v => v.toFixed(1));
-bind('cs', 'csV', v => cfg.cs = v, v => v.toFixed(1) + ' tu');
-
 /* ---- table & stats ---- */
 const $ = id => document.getElementById(id);
 const f1 = v => v.toFixed(1);
 function renderTable(){
   S.dirty = false;
-  $('mT').textContent = f1(S.t);
-  $('mDone').textContent = S.completed;
-  $('mQ').innerHTML = S.queue.length + (S.queue.length >= MAXQ ? ' <span class="u warn">full</span>' : '');
   $('mW').innerHTML = S.completed ? f1(S.sumWait / S.completed) + '<span class="u">tu</span>' : '-';
   $('mTA').innerHTML = S.completed ? f1(S.sumTurn / S.completed) + '<span class="u">tu</span>' : '-';
-  $('mU').innerHTML = S.t > 0 ? Math.round(S.busy / S.t * 100) + '<span class="u">%</span>' : '-';
   $('mCS').textContent = S.switches;
-  $('mCSP').textContent = S.completed ? (S.switches / (S.completed + (S.cpu ? 1 : 0))).toFixed(2) : '-';
-  $('mCST').textContent = S.t > 0 ? (S.switches / S.t).toFixed(3) : '-';
-
-  const pidCell = p => `<span class="pid"><i style="background:${p.color}"></i>${p.name}</span>`;
-  const ph = '<span class="ph">—</span>';
-  const empty = label => `<tr class="ph-row"><td>${label ? `<span class="ph">${label}</span>` : ph}</td><td>${ph}</td><td>${ph}</td><td>${ph}</td><td>${ph}</td><td><span class="st ph-st">${label ? '' : '—'}</span></td></tr>`;
-  let html = `<tr class="sep"><td colspan="6">On the CPU</td></tr>`;
-  if (S.cpu){
-    const p = S.cpu;
-    const waited = (p.start ?? S.t) - p.arrival;
-    const st = p.state === 'cs' ? '<span class="st cs">switching</span>' : `<span class="st run">running · ${f1(Math.max(p.remaining,0))} left</span>`;
-    html += `<tr><td>${pidCell(p)}</td><td>${f1(p.arrival)}</td><td>${p.burst}</td><td>${f1(waited)}</td><td>-</td><td>${st}</td></tr>`;
-  } else html += empty('idle');
-  html += `<tr class="sep"><td colspan="6">Ready queue · ${S.queue.length} waiting</td></tr>`;
-  for (let i = 0; i < MAXQ; i++){
-    const p = S.queue[i];
-    html += p
-      ? `<tr><td>${pidCell(p)}</td><td>${f1(p.arrival)}</td><td>${p.burst}</td><td>${f1(S.t - p.arrival)}</td><td>-</td><td><span class="st">#${i + 1} in line</span></td></tr>`
-      : empty(i === 0 ? 'empty' : '');
-  }
-  html += `<tr class="sep"><td colspan="6">Recently finished</td></tr>`;
-  for (let i = 0; i < 3; i++){
-    const p = S.done[i];
-    html += p
-      ? `<tr class="donerow"><td>${pidCell(p)}</td><td>${f1(p.arrival)}</td><td>${p.burst}</td><td>${f1(p.wait)}</td><td>${f1(p.turn)}</td><td><span class="st">done @ ${f1(p.finish)}</span></td></tr>`
-      : empty('');
-  }
-  $('tbody').innerHTML = html;
 }
 
 /* ---- drawing ---- */
@@ -792,19 +726,38 @@ function draw(){
   ctx.fillStyle = '#8591a8';
   ctx.fillText('NEW ARRIVALS ↓', L.beltL, 18);
 
-  // belt
-  const bL = L.beltL, bR = L.beltR, bY = L.beltY, bH = 16;
-  ctx.save(); rr(ctx, bL, bY, bR - bL, bH, 8); ctx.clip();
-  ctx.fillStyle = '#ebebe8'; ctx.fillRect(bL, bY, bR - bL, bH);
-  ctx.strokeStyle = '#dcdcd8'; ctx.lineWidth = 6;
-  const off = S.beltOff % 22;
-  for (let x = bL - 30 + off; x < bR + 30; x += 22){ ctx.beginPath(); ctx.moveTo(x, bY + bH + 2); ctx.lineTo(x + 12, bY - 2); ctx.stroke(); }
+  // belt (side view of a real conveyor: frame, legs, rubber belt with moving treads, spinning end rollers)
+  const bL = L.beltL, bR = L.beltR, bY = L.beltY, bH = 16, rad = bH / 2 + 3, cy = bY + bH / 2;
+  // legs + feet
+  ctx.fillStyle = '#9aa0ab';
+  for (let x = bL + 30; x < bR - 20; x += 96){
+    ctx.fillRect(x - 3, bY + bH + 6, 6, 40);
+    ctx.fillRect(x - 12, bY + bH + 44, 24, 4);
+  }
+  // steel side frame under the belt
+  ctx.fillStyle = '#b9bec7'; rr(ctx, bL + 4, bY + bH + 2, bR - bL - 8, 7, 2); ctx.fill();
+  ctx.fillStyle = '#9aa0ab'; ctx.fillRect(bL + 4, bY + bH + 7, bR - bL - 8, 2);
+  // belt body
+  ctx.save(); rr(ctx, bL, bY, bR - bL, bH, bH / 2); ctx.clip();
+  ctx.fillStyle = '#3d4351'; ctx.fillRect(bL, bY, bR - bL, bH);
+  const off = S.beltOff % 24;
+  ctx.fillStyle = '#566074';
+  for (let x = bL - 24 + off; x < bR + 24; x += 24) ctx.fillRect(x, bY + 3, 5, bH - 6);   // treads
+  ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fillRect(bL, bY, bR - bL, 2);              // top highlight
   ctx.restore();
-  ctx.fillStyle = '#b4b4ae';
-  [bL + 8, bR - 8].forEach(x => { ctx.beginPath(); ctx.arc(x, bY + bH / 2, 9, 0, Math.PI * 2); ctx.fill(); });
-  ctx.fillStyle = '#ffffff';
-  [bL + 8, bR - 8].forEach(x => { ctx.beginPath(); ctx.arc(x, bY + bH / 2, 3, 0, Math.PI * 2); ctx.fill(); });
-  for (let x = bL + 40; x < bR - 20; x += 70){ ctx.fillStyle = '#e5e5e2'; ctx.fillRect(x, bY + bH, 4, 18); }
+  // end rollers
+  [bL + bH / 2, bR - bH / 2].forEach(x => {
+    ctx.fillStyle = '#9aa0ab'; ctx.beginPath(); ctx.arc(x, cy, rad, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#6f7683'; ctx.lineWidth = 1.5; ctx.stroke();
+    const ang = S.beltOff / rad;
+    ctx.strokeStyle = '#6f7683'; ctx.lineWidth = 2;
+    for (let k = 0; k < 3; k++){
+      const t = ang + k * Math.PI / 3;
+      ctx.beginPath(); ctx.moveTo(x - Math.cos(t) * (rad - 3), cy - Math.sin(t) * (rad - 3));
+      ctx.lineTo(x + Math.cos(t) * (rad - 3), cy + Math.sin(t) * (rad - 3)); ctx.stroke();
+    }
+    ctx.fillStyle = '#4a5060'; ctx.beginPath(); ctx.arc(x, cy, 3, 0, Math.PI * 2); ctx.fill();
+  });
 
   // CPU body
   const { cpuX, cpuY, cpuW, cpuH } = L;
