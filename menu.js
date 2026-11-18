@@ -66,6 +66,7 @@ let busy = false;
 const nextFrame = () => new Promise(r => requestAnimationFrame(r));
 const play = (el, keyframes, opts) => {
   const a = el.animate(keyframes, { fill: 'forwards', ...opts });
+  a.persist();   // otherwise the browser drops it once a later animation overrides it, and it can't be reversed
   return a;
 };
 const done = a => a.finished.catch(() => {});
@@ -74,17 +75,97 @@ function setHash(id) {
   try { history.replaceState(null, '', id ? '#' + id : location.pathname + location.search); } catch (e) {}
 }
 
-function showViewer(t) {
+/* ---------- preloading (so the animation never competes with page loading) ---------- */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let viewerFor = null, viewerReady = Promise.resolve();
+function preloadViewer(t) {
+  if (viewerFor === t.id) return viewerReady;
+  viewerFor = t.id;
+  viewerReady = new Promise(res => {
+    const on = () => {
+      let ok = true;
+      try { ok = frame.contentWindow.location.href.includes(t.file); } catch (e) {}
+      if (ok) { frame.removeEventListener('load', on); res(); }
+    };
+    frame.addEventListener('load', on);
+  });
   frame.src = t.file;
   frame.title = t.title;
+  return viewerReady;
+}
+function resetViewer() { viewerFor = null; frame.src = 'about:blank'; }
+
+function showViewer(t) {
+  preloadViewer(t);
   document.title = t.title;
   document.body.classList.add('open');
   viewer.classList.add('show');
 }
 
+/* ---------- the 3D book (built once per hover, destroyed after use) ---------- */
+const backdrop = Object.assign(document.createElement('div'), { className: 'backdrop' });
+stage.append(backdrop);
+let prepared = null;   // single slot: { id, box, cover, page, live, W, H, T, vw, vh }
+
+function destroyPrepared() { if (prepared) { prepared.box.remove(); prepared = null; } }
+
+function prepare(t) {
+  if (prepared && prepared.id === t.id) return prepared;
+  destroyPrepared();
+  const T = t.thickness, H = t.height, W = Math.round(H * 0.72);   // a real, portrait book
+  const box = document.createElement('div');
+  box.className = 'box';
+  box.style.cssText = `width:${W}px;height:${H}px;--c:${t.color};--W:${W}px;`;
+  const spine = spineEl(t);
+  spine.style.width = T + 'px'; spine.style.height = H + 'px';
+  const backcover = Object.assign(document.createElement('div'), { className: 'backcover' });
+  const page = Object.assign(document.createElement('div'), { className: 'page' });
+  page.style.transform = `translateZ(${T - 3}px)`;
+  const live = document.createElement('iframe');                    // live presentation on the page
+  live.src = t.file;
+  live.tabIndex = -1;
+  live.setAttribute('aria-hidden', 'true');
+  page.appendChild(live);
+  const cover = Object.assign(document.createElement('div'), { className: 'cover' });
+  cover.style.transform = `translateZ(${T}px)`;
+  cover.innerHTML = '<div class="cover-front"><div class="chip"></div><div><h2></h2><p></p></div></div><div class="cover-back"></div>';
+  cover.querySelector('h2').textContent = t.title;
+  cover.querySelector('p').textContent = t.subtitle || '';
+  box.append(backcover, spine, page, cover);
+  stage.append(box);
+  prepared = { id: t.id, box, cover, page, live, W, H, T, vw: 0, vh: 0 };
+  return prepared;
+}
+
+/* the page is as wide as the screen; at first only a book-sized part of it is visible */
+function configure(p) {
+  const vw = innerWidth, vh = innerHeight;
+  if (p.vw === vw && p.vh === vh) return;
+  p.vw = vw; p.vh = vh;
+  p.Wl = Math.round(p.H * vw / vh);
+  p.page.style.width = p.Wl + 'px';
+  p.page.style.clipPath = `inset(0px ${p.Wl - p.W}px 0px 0px)`;
+  p.live.style.cssText = `width:${vw}px;height:${vh}px;transform:scale(${p.Wl / vw});`;
+}
+
+let coolTimer;
+function warm(t) { clearTimeout(coolTimer); if (current || busy) return; prepare(t); preloadViewer(t); }
+function cool() {
+  clearTimeout(coolTimer);
+  coolTimer = setTimeout(() => { if (!current && !busy) { destroyPrepared(); resetViewer(); } }, 4000);
+}
+buttons.forEach((b, i) => {
+  const t = topics[i];
+  b.addEventListener('pointerenter', () => warm(t));
+  b.addEventListener('focus', () => warm(t));
+  b.addEventListener('pointerleave', cool);
+  b.addEventListener('blur', cool);
+});
+
 async function openBook(t, btn, animate) {
   if (busy || current) return;
   busy = true;
+  clearTimeout(coolTimer);
   current = { t, btn, anims: [] };
   setHash(t.id);
 
@@ -95,59 +176,73 @@ async function openBook(t, btn, animate) {
     return;
   }
 
+  const p = prepare(t);
+  configure(p);
+  preloadViewer(t);
+  const { box, cover, page, W, H, T, Wl, vw, vh } = p;
+
   const r = btn.getBoundingClientRect();
-  const T = t.thickness, H = Math.round(r.height), W = Math.round(H * 0.72);
-  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-  const vw = innerWidth, vh = innerHeight;
+  const lift = -new DOMMatrixReadOnly(getComputedStyle(btn).transform).m42 || 0;   // hover raise currently applied
+  const cx = r.left + r.width / 2, cy = r.top + lift + r.height / 2;               // resting centre on the shelf
   const dx = vw / 2 - cx, dy = vh / 2 - cy;
-  const fit = Math.min(vw * 0.55 / W, vh * 0.8 / H);          // book "in front of the screen"
-  const fill = Math.max(vw / W, vh / H) * 1.04;                // page fills the viewport
+  const fit = Math.min(vw * 0.5 / W, vh * 0.78 / H);            // book "in front of the screen"
+  const fill = vw / Wl * 1.02;                                  // widened page fills the viewport
+  const dx3 = dx - fill * (Wl - W) / 2;                         // keep the *page* centred, not the cover
 
-  const tf = (x, y, z, ry, s) => `translate3d(${x}px,${y}px,${z}px) rotateY(${ry}deg) scale(${s})`;
-  const k0 = tf(-T / 2, 0, -W / 2, 90, 1);                     // spine exactly over the shelf book
-  const k1 = tf(-T / 2, -14, 90 - W / 2, 90, 1);               // pulled toward the viewer
-  const k2 = tf(dx, dy, 0, 0, fit);                            // centred, cover facing us
-  const k3 = tf(dx, dy, 0, 0, fill);                           // zoomed onto the first page
+  // Position/size and rotation are animated separately (CSS translate / scale / rotate),
+  // so the book can be spine-on for the part of the trip that is near the shelf.
+  const tr = (x, y, z) => `${x}px ${y}px ${z}px`;
+  const P0 = tr(-T / 2, 0, -W / 2);                             // spine exactly over the shelf book (resting)
+  const Pr = tr(-T / 2, -lift, -W / 2);                         // ...as it is while hovered
+  const Po = tr(-T / 2, -lift, -W / 2 + W * 0.9);               // slid straight out of the shelf
+  const P2 = tr(dx, dy, 0);                                     // centred in front of the screen
+  const P3 = tr(dx3, dy, 0);                                    // zoomed onto the first page
 
-  // build overlay
-  stage.replaceChildren();
-  const backdrop = Object.assign(document.createElement('div'), { className: 'backdrop' });
-  const box = document.createElement('div');
-  box.className = 'box';
-  box.style.cssText = `left:${cx - W / 2}px;top:${cy - H / 2}px;width:${W}px;height:${H}px;--c:${t.color};--W:${W}px;` +
-                      `transform:${k0}`;
-  const spine = spineEl(t);
-  spine.style.width = T + 'px'; spine.style.height = H + 'px';
-  spine.style.left = '0px';
-  const backcover = Object.assign(document.createElement('div'), { className: 'backcover' });
-  const page = Object.assign(document.createElement('div'), { className: 'page' });
-  page.style.transform = `translateZ(${T - 3}px)`;
-  const cover = Object.assign(document.createElement('div'), { className: 'cover' });
-  cover.style.transform = `translateZ(${T}px)`;
-  cover.innerHTML = '<div class="cover-front"><div class="chip"></div><div><h2></h2><p></p></div></div><div class="cover-back"></div>';
-  cover.querySelector('h2').textContent = t.title;
-  cover.querySelector('p').textContent = t.subtitle || '';
-  box.append(backcover, spine, page, cover);
-  stage.append(backdrop, box);
+  box.style.left = (cx - W / 2) + 'px';
+  box.style.top = (cy - H / 2) + 'px';
+  Object.assign(box.style, { transform: 'none', translate: Pr, rotate: 'y 90deg', scale: '1' });
+  stage.style.perspectiveOrigin = `${cx}px ${cy}px`;            // look straight at the spine, like the flat book
   stage.classList.add('on');
   btn.style.visibility = 'hidden';
   await nextFrame();
 
-  const A = play(box, [{ transform: k0 }, { transform: k1, offset: .28 }, { transform: k2 }],
-                 { duration: 1100, easing: 'cubic-bezier(.45,0,.2,1)' });
-  const Abd = play(backdrop, [{ opacity: 0 }, { opacity: 1 }], { duration: 1100 });
+  const ease = 'cubic-bezier(.45,0,.2,1)';
+  // 1) slide straight out, 2) fly toward the centre spine-first, 3) turn the cover to us.
+  // Played in reverse on close: the book turns away first, travels spine-on, and slides straight in.
+  const DA = 1400, s1 = 0.3, r1 = s1 + 0.5 * (1 - s1), seg = 'cubic-bezier(.45,0,.25,1)';
+  const A = play(box, [
+    { translate: Pr, scale: '1', easing: 'ease-in-out' },
+    { translate: Po, scale: '1', easing: seg, offset: s1 },
+    { translate: P2, scale: `${fit}` },
+  ], { duration: DA });
+  const Ar = play(box, [
+    { rotate: 'y 90deg' },
+    { rotate: 'y 90deg', easing: 'cubic-bezier(.4,0,.2,1)', offset: r1 },
+    { rotate: 'y 0deg' },
+  ], { duration: DA });
+  // the viewpoint rides along with the spine, so its sides stay edge-on (invisible) while it travels
+  const Apo = play(stage, [
+    { perspectiveOrigin: `${cx}px ${cy}px` },
+    { perspectiveOrigin: `${cx}px ${cy}px`, easing: seg, offset: s1 },
+    { perspectiveOrigin: `${vw / 2 + fit * T / 2}px ${vh / 2}px` },
+  ], { duration: DA });
+  Object.assign(current, { apo: Apo, ar: Ar, box, P0, Pr, lift });
+  const Abd = play(backdrop, [{ opacity: 0 }, { opacity: 1 }], { duration: DA });
   current.anims = [A, Abd];
   await done(A);
 
   const cz = `translateZ(${T}px)`;
-  const B = play(box, [{ transform: k2 }, { transform: k3 }], { duration: 950, easing: 'cubic-bezier(.55,0,.8,.4)' });
+  const B = play(box, [{ translate: P2, scale: `${fit}` }, { translate: P3, scale: `${fill}` }], { duration: 1000, easing: ease });
   const Bc = play(cover, [{ transform: `${cz} rotateY(0deg)` }, { transform: `${cz} rotateY(-168deg)` }],
                   { duration: 800, easing: 'ease-in-out' });
-  current.anims.push(B, Bc);
+  const Bp = play(page, [{ clipPath: `inset(0px ${Wl - W}px 0px 0px)` }, { clipPath: 'inset(0px 0px 0px 0px)' }],
+                  { duration: 1000, easing: ease });
+  current.anims.push(B, Bc, Bp);
   await done(B);
 
+  await Promise.race([viewerReady, sleep(1500)]);               // never show an unloaded viewer
   showViewer(t);
-  await new Promise(r => setTimeout(r, 380));
+  await sleep(380);
   stage.classList.remove('on');
   busy = false;
 }
@@ -155,40 +250,41 @@ async function openBook(t, btn, animate) {
 async function closeBook() {
   if (busy || !current) return;
   busy = true;
-  const { t, btn, anims } = current;
+  const { btn, anims, box, P0, Pr, lift } = current;
   setHash('');
   document.title = 'Library';
   viewer.classList.remove('show');
 
   if (!anims.length) {                       // opened without animation
-    await new Promise(r => setTimeout(r, reduced ? 0 : 360));
+    await sleep(reduced ? 0 : 360);
     finishClose(btn);
     return;
   }
 
   stage.classList.add('on');
-  await new Promise(r => setTimeout(r, 360)); // let the viewer fade out
-  const [A, Abd, B, Bc] = anims;
-  B.reverse(); Bc.reverse();
+  await sleep(360);                           // let the viewer fade out
+  const [A, Abd, B, Bc, Bp] = anims;
+  B.reverse(); Bc.reverse(); Bp.reverse();
   await done(B);
-  B.cancel(); Bc.cancel();
-  A.reverse(); Abd.reverse();
+  B.cancel(); Bc.cancel(); Bp.cancel();
+  A.reverse(); Abd.reverse(); current.ar.reverse(); current.apo.reverse();
   await done(A);
+  if (lift > 0.5) await done(play(box, [{ translate: Pr }, { translate: P0 }], { duration: 160, easing: 'ease-out' }));
   finishClose(btn);
 }
 
 function finishClose(btn) {
-  anims_cancel();
+  [...(current?.anims || []), current?.apo, current?.ar].forEach(a => { try { a && a.cancel(); } catch (e) {} });
+  stage.style.perspectiveOrigin = '';
   stage.classList.remove('on');
-  stage.replaceChildren();
+  destroyPrepared();
   btn.style.visibility = '';
-  frame.src = 'about:blank';
+  resetViewer();
   document.body.classList.remove('open');
   current = null;
   busy = false;
   layout();
 }
-function anims_cancel() { (current?.anims || []).forEach(a => { try { a.cancel(); } catch (e) {} }); }
 
 /* ---------- controls ---------- */
 $('back').addEventListener('click', closeBook);
