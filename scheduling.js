@@ -27,16 +27,28 @@ function go(i){
 window.addEventListener('message', e => {
   if (e.data && e.data.type === 'goto') { const k = names.indexOf(e.data.name); if (k >= 0) go(k); }
 });
+// show the bottom nav bar only while the mouse is near the bottom edge
+const navBar = document.querySelector('.nav');
+const NAV_ZONE = 90;   // px from the bottom of the window
+document.addEventListener('mousemove', e => {
+  const near = e.clientY > window.innerHeight - NAV_ZONE || navBar.contains(e.target);
+  navBar.classList.toggle('show', near);
+});
+document.documentElement.addEventListener('mouseleave', () => navBar.classList.remove('show'));
 document.getElementById('prev').onclick = () => go(cur - 1);
 document.getElementById('next').onclick = () => go(cur + 1);
 window.addEventListener('hashchange', () => { const k = names.indexOf(location.hash.slice(1)); if (k >= 0) go(k); });
-window.addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT') return;
-  if (e.key === 'Escape' && window.parent !== window) { window.parent.postMessage('close-book', '*'); return; }
-  if (e.key === 'ArrowRight' || e.key === 'PageDown') go(cur + 1);
-  else if (e.key === 'ArrowLeft' || e.key === 'PageUp') go(cur - 1);
-  else if (e.key === ' ' && sims[names[cur]]) { e.preventDefault(); sims[names[cur]].togglePause(); }
-});
+function onKey(key, e){
+  if (key === 'Escape' && window.parent !== window) { window.parent.postMessage('close-book', '*'); return; }
+  if (key === 'ArrowRight' || key === 'PageDown') go(cur + 1);
+  else if (key === 'ArrowLeft' || key === 'PageUp') go(cur - 1);
+  else if (key === ' ' && sims[names[cur]]) { if (e) e.preventDefault(); sims[names[cur]].togglePause(); }
+  else if (key === ' ' && names[cur] === 'compare') { if (e) e.preventDefault(); toggleCompare(); }
+  else if (key === ' ' && names[cur] === 'context-switch') { if (e) e.preventDefault(); swToggle(); }
+}
+window.addEventListener('keydown', e => { if (e.target.tagName !== 'INPUT') onKey(e.key, e); });
+// keys pressed while the library page (not this frame) has focus are forwarded from there
+window.addEventListener('message', e => { if (e.data && e.data.type === 'key') onKey(e.data.key); });
 
 /* canvas helper */
 function fitCanvas(cv){
@@ -118,6 +130,157 @@ function drawTimeline(q){
   ctx.globalAlpha = 1;
   ctx.fillStyle = '#1a2233'; ctx.fillRect(W - 2, 4, 2, H - 8);
 }
+
+/* ================= CONTEXT SWITCH, INSTRUCTION BY INSTRUCTION ================= */
+// The same three programs as on slide 1. Each turn ends with a context switch during which the
+// switch code below is "executed" one line at a time: registers go onto the old process's stack,
+// the stack pointer and page tables change, and the new process's registers come off its stack.
+const SW_REGS = ['rbp', 'rbx', 'r12', 'r13', 'r14', 'r15'];   // callee-saved registers, in push order
+const SW_CODE = [   // [instruction, comment, kind]
+  ['switch_to:',      'called by the scheduler', 'label'],
+  ['push rbp',        'save prev', 'push'],
+  ['push rbx',        '', 'push'], ['push r12', '', 'push'], ['push r13', '', 'push'],
+  ['push r14',        '', 'push'], ['push r15', '', 'push'],
+  ['mov  [rdi], rsp', 'prev->sp = rsp', 'savesp'],
+  ['mov  rsp, rsi',   'next\'s stack', 'loadsp'],
+  ['mov  cr3, rdx',   'next\'s memory', 'cr3'],
+  ['pop  r15',        'restore next', 'pop'],
+  ['pop  r14',        '', 'pop'], ['pop  r13', '', 'pop'], ['pop  r12', '', 'pop'],
+  ['pop  rbx',        '', 'pop'], ['pop  rbp', '', 'pop'],
+  ['ret',             'into next', 'ret'],
+];
+// the five steps of a switch, and which kinds of code line belong to each
+const SW_STEPS = [
+  { k:['label'],          html:'A timer interrupt ends the turn, and the scheduler <b>picks the next process</b>.' },
+  { k:['push', 'savesp'], html:'The OS <b>saves the old context</b>: registers and stack pointer.' },
+  { k:['loadsp', 'cr3'],  html:'It <b>switches</b> to the new process\'s stack and memory.' },
+  { k:['pop'],            html:'It <b>loads the new context</b>: registers come back from that stack.' },
+  { k:['ret'],            html:'The new process <b>continues exactly where it stopped</b>.' },
+];
+document.getElementById('swSteps').innerHTML = SW_STEPS.map(st => `<li><span>${st.html}</span></li>`).join('');
+const swStepEls = [...document.getElementById('swSteps').children];
+const SW_RUN = 3.2, SW_LINE = 0.5;   // seconds per turn and per instruction at 1×
+const swCodeEl = document.getElementById('swCode');
+swCodeEl.innerHTML = SW_CODE.map(([ins, cm, k], i) => {
+  const html = ins.replace(/^(\w+)(\s+)(.*)$/, (m, op, sp, args) => op + sp + args.replace(/\b(r\w+|cr3)\b/g, '<b>$1</b>'));
+  return `<div class="ln${k === 'label' ? ' lbl' : ''}"><span class="no">${i + 1}</span><span class="ins">${html}</span><span class="cm">${cm ? '; ' + cm : ''}</span></div>`;
+}).join('');
+const swLines = [...swCodeEl.children];
+const REG_NAMES = [...SW_REGS, 'rsp', 'cr3', 'rip'];
+document.getElementById('swRegs').innerHTML = REG_NAMES.map(r => `<div class="reg" data-r="${r}">${r}</div>`).join('');
+document.getElementById('swStacks').innerHTML = apps.map((a, i) =>
+  `<div class="stk" data-p="${i}" style="--c:${a.c}"><div class="t"><span style="color:${a.c}">${a.n}</span><i>← rsp</i></div>` +
+  SW_REGS.map(r => `<div class="slot" data-r="${r}">${r}</div>`).join('') + '<div class="sp"></div></div>').join('');
+
+const sw = { run:0, next:1, line:-1, t:0, paused:false, speed:1, hist:[{a:0, d:0}],
+  regs:{}, stacks:[], saved:[], rspOwner:0 };
+function swReset(){
+  sw.run = 0; sw.next = 1; sw.line = -1; sw.t = 0; sw.hist = [{a:0, d:0}]; sw.rspOwner = 0;
+  REG_NAMES.forEach(r => sw.regs[r] = 0);
+  // the running process has its registers in the CPU; the others have them saved on their stacks
+  sw.stacks = apps.map((a, i) => i === 0 ? 0 : SW_REGS.length);
+  sw.saved = apps.map((a, i) => i !== 0);
+}
+swReset();
+function swExec(i){   // apply the effect of code line i
+  const [, , k] = SW_CODE[i], prev = sw.run, next = sw.next;
+  if (k === 'label') sw.regs.rip = -1;
+  else if (k === 'push') sw.stacks[prev]++;
+  else if (k === 'savesp') sw.saved[prev] = true;
+  else if (k === 'loadsp'){ sw.regs.rsp = next; sw.rspOwner = next; }
+  else if (k === 'cr3') sw.regs.cr3 = next;
+  else if (k === 'pop'){ sw.stacks[next]--; sw.regs[SW_REGS[sw.stacks[next]]] = next; }
+  else if (k === 'ret'){ sw.saved[next] = false; sw.regs.rip = next; }
+}
+function swStatus(){
+  const P = i => `<b style="color:${apps[i].c}">${apps[i].n}</b>`, prev = P(sw.run), next = P(sw.next);
+  if (sw.line < 0) return `${prev} is running. Its registers live in the CPU.`;
+  const [ins, , k] = SW_CODE[sw.line], reg = ins.split(/\s+/)[1];
+  return {
+    label:  `Timer interrupt: ${prev}'s turn is over. The scheduler picks ${next} and calls switch_to.`,
+    push:   `Saving ${prev}'s <b>${reg}</b> on ${prev}'s stack.`,
+    savesp: `Writing down where ${prev}'s stack ends, so it can be resumed later.`,
+    loadsp: `Switching the stack pointer to ${next}'s stack.`,
+    cr3:    `Switching to ${next}'s memory (its page tables).`,
+    pop:    `Restoring ${next}'s <b>${reg}</b> from ${next}'s stack.`,
+    ret:    `Returning into ${next}, exactly where it stopped last time.`,
+  }[k];
+}
+function swRender(){
+  swLines.forEach((el, i) => {
+    el.classList.toggle('cur', i === sw.line);
+    if (i === sw.line){ const k = SW_CODE[i][2];
+      el.style.setProperty('--hl', k === 'push' || k === 'savesp' ? apps[sw.run].c : k === 'label' ? '#d98200' : apps[sw.next].c); }
+  });
+  document.querySelectorAll('#swRegs .reg').forEach(el => {
+    const o = sw.regs[el.dataset.r];
+    el.style.setProperty('--c', o < 0 ? '#8591a8' : apps[o].c);
+    if (el.dataset.r === 'rip') el.textContent = o < 0 ? 'rip: kernel' : 'rip';
+  });
+  document.querySelectorAll('#swStacks .stk').forEach((el, p) => {
+    el.classList.toggle('rsp', sw.rspOwner === p);
+    el.querySelectorAll('.slot').forEach((s, k) => s.classList.toggle('full', k < sw.stacks[p]));
+    const sp = el.querySelector('.sp');
+    sp.textContent = sw.saved[p] ? 'saved sp ✓' : 'running / not saved';
+    sp.classList.toggle('ok', sw.saved[p]);
+  });
+  const kind = sw.line >= 0 ? SW_CODE[sw.line][2] : null;
+  swStepEls.forEach((el, i) => el.classList.toggle('on', kind !== null && SW_STEPS[i].k.includes(kind)));
+  document.getElementById('swStatus').innerHTML = swStatus();
+}
+function swStep(rawDt){
+  const dt = sw.paused ? 0 : rawDt * sw.speed;
+  sw.t += dt;
+  // the switch is slowed down far more than the programs, so draw it compressed on the timeline
+  sw.hist[sw.hist.length - 1].d += sw.line >= 0 ? dt * 0.25 : dt;
+  if (sw.line < 0 && sw.t >= SW_RUN){                       // turn is over: start the switch
+    sw.t = 0; sw.line = 0; swExec(0); sw.hist.push({a:-1, d:0});
+  } else if (sw.line >= 0 && sw.t >= SW_LINE){              // next instruction
+    sw.t = 0; sw.line++;
+    if (sw.line < SW_CODE.length) swExec(sw.line);
+    else {                                                  // switch done: next process runs
+      sw.line = -1; sw.run = sw.next; sw.next = (sw.next + 1) % apps.length;
+      sw.hist.push({a:sw.run, d:0});
+      if (sw.hist.length > 200) sw.hist.splice(0, 100);
+    }
+  }
+  swRender();
+  swDrawTimeline();
+}
+function swDrawTimeline(){
+  const f = fitCanvas(document.getElementById('swTl')); if (!f) return;
+  const { ctx, W, H } = f, win = 26;   // seconds of demo time visible
+  ctx.clearRect(0, 0, W, H);
+  let x = W;
+  for (let i = sw.hist.length - 1; i >= 0 && x > 0; i--){
+    const s = sw.hist[i], w = s.d / win * W;
+    x -= w;
+    if (s.a < 0){
+      ctx.fillStyle = '#f4f4f2'; ctx.fillRect(x, 8, w, H - 16);
+      ctx.save(); ctx.beginPath(); ctx.rect(x, 8, w, H - 16); ctx.clip();
+      ctx.strokeStyle = 'rgba(217,60,60,.55)'; ctx.lineWidth = 3;
+      for (let k = x - H; k < x + w; k += 9){ ctx.beginPath(); ctx.moveTo(k, H - 8); ctx.lineTo(k + H - 16, 8); ctx.stroke(); }
+      ctx.restore();
+      ctx.strokeStyle = '#d93c3c'; ctx.lineWidth = 1.5; ctx.strokeRect(x + 0.75, 8.75, Math.max(w - 1.5, 0), H - 17.5);
+      if (w > 70){ ctx.fillStyle = '#d93c3c'; ctx.font = '700 11px "JetBrains Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('context switch', x + w / 2, H / 2); }
+    } else {
+      ctx.fillStyle = apps[s.a].c; ctx.globalAlpha = i === sw.hist.length - 1 ? 1 : 0.8;
+      ctx.fillRect(x, 8, Math.max(w - 1, 0.5), H - 16); ctx.globalAlpha = 1;
+      if (w > 46){ ctx.fillStyle = '#fff'; ctx.font = '600 11px "Space Grotesk", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(apps[s.a].n, x + w / 2, H / 2); }
+    }
+  }
+  ctx.fillStyle = '#1a2233'; ctx.fillRect(W - 2, 4, 2, H - 8);
+}
+function swToggle(){ sw.paused = !sw.paused; document.getElementById('swPlay').textContent = sw.paused ? 'Play' : 'Pause'; }
+document.getElementById('swPlay').onclick = swToggle;
+document.getElementById('swSpeed').oninput = e => {
+  sw.speed = 2 ** +e.target.value;
+  document.getElementById('swSpeedVal').textContent = (sw.speed < 1 ? sw.speed.toFixed(2) : +sw.speed.toFixed(1)) + '×';
+};
+document.getElementById('swSpeed').oninput({ target: document.getElementById('swSpeed') });
+swRender();
 
 /* ================= SLIDE 2: state diagram ================= */
 const INFO = {
@@ -704,22 +867,30 @@ const NAMES = ['System','Chrome','WhatsApp','Spotify','VS Code','Terminal','Slac
 const nameOf = pid => NAMES[(pid - 1) % NAMES.length];
 const fitText = (ctx, t, maxW) => { if (ctx.measureText(t).width <= maxW) return t; while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1); return t + '…'; };
 const color = pid => `hsl(${(pid * 67) % 360} 68% 50%)`;
-const randBurst = () => 2 + Math.floor(Math.random() * 7);          // 2..8
-const expRand = () => -Math.log(1 - Math.random()) / cfg.rate;
+// The workload (arrival times, bursts, priorities, nice values) comes from a seeded generator, so every
+// simulation receives exactly the same processes at the same simulated times and they can be compared.
+// Each simulation has its own copy, restarted on Reset; processes added with the buttons use Math.random
+// so they don't shift the shared sequence.
+const SEED = 20261119;
+function mulberry32(a){ return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+let rng = mulberry32(SEED);
+const randBurst = (r = Math.random) => 2 + Math.floor(r() * 7);          // 2..8
+const expRand = () => -Math.log(1 - rng()) / cfg.rate;
 
 function resetSim(){
+  rng = mulberry32(SEED);
   S = { t:0, nextPid:1, queue:[], cpu:null, mode:'idle', csLeft:0, qLeft:0, slice:1, minVr:0, done:[], vis:[],
         completed:0, sumWait:0, sumTurn:0, switches:0, busy:0, csTime:0, gantt:[], nextArrival:1.5,
         beltOff:0, animUntil:0, dirty:true };
   if (policy === 'prio'){ spawn(0, 5, 3); spawn(0, 3, 2); spawn(0, 7, 1); }
-  else if (policy === 'cfs'){ spawn(0, 5, 1, 0); spawn(0, 6, 1, -5); spawn(0, 4, 1, 5); }
+  else if (policy === 'cfs'){ spawn(0, 5, 1, 0); spawn(0, 3, 1, -5); spawn(0, 7, 1, 5); }
   else { spawn(0, 5); spawn(0, 3); spawn(0, 7); }
 }
 const PRIO_COL = ['', '#d93c3c', '#e8730c', '#d4a300', '#2e9e5b'];
-const randPrio = () => 1 + Math.floor(Math.random() * 4);
+const randPrio = (r = Math.random) => 1 + Math.floor(r() * 4);
 let aging = false;
 const NICE_W = { '-5':3121, '0':1024, '5':335 };       // Linux weights for nice -5 / 0 / +5
-const randNice = () => [-5, 0, 0, 5][Math.floor(Math.random() * 4)];
+const randNice = (r = Math.random) => [-5, 0, 0, 5][Math.floor(r() * 4)];
 const CFS_LATENCY = 12, CFS_MIN_GRAN = 1;                // target latency and minimum slice (ms)
 function cfsSlice(){
   const all = S.queue.concat(S.cpu ? [S.cpu] : []);
@@ -764,7 +935,7 @@ function tick(h){
     S.queue.forEach(p => { const n = Math.max(1, p.basePrio - Math.floor((S.t - p.arrival) / 8)); if (n !== p.prio){ p.prio = n; ch = true; } });
     if (ch) sortQueue();
   }
-  while (S.nextArrival <= end){ spawn(+S.nextArrival.toFixed(2), randBurst()); S.nextArrival += expRand(); }
+  while (S.nextArrival <= end){ spawn(+S.nextArrival.toFixed(2), randBurst(rng), randPrio(rng), randNice(rng)); S.nextArrival += expRand(); }
   if (S.mode === 'idle' && S.queue.length) dispatch(S.t);
   const g = S.gantt[S.gantt.length - 1];
   if (S.mode === 'cs'){
@@ -806,9 +977,17 @@ function togglePause(){
 playBtn.onclick = togglePause;
 $('resetBtn').onclick = () => { resetSim(); renderTable(); };
 let $rate = $('rateSlider');
+const BASE_SPEED = cfg.speed;   // 1× on the slider = the default pace
+// the slider is exponential: its value is a power of two, from 2^-2 = 0.25× to 2^5 = 32×
+$('speedSlider').oninput = e => {
+  const m = 2 ** +e.target.value; cfg.speed = BASE_SPEED * m;
+  $('speedVal').textContent = (m < 1 ? m.toFixed(2) : m < 10 ? +m.toFixed(1) : Math.round(m)) + '×';
+};
 $rate.oninput = () => { const m = +$rate.value; cfg.rate = BASE_RATE * m; $('rateVal').textContent = m.toFixed(1) + '×'; };
 if ($('longBtn')) $('longBtn').onclick = () => { spawn(+S.t.toFixed(2), 18); S.animUntil = performance.now() + 700; renderTable(); };
 if ($('quantumSlider')) $('quantumSlider').oninput = () => { cfg.quantum = +$('quantumSlider').value; $('quantumVal').textContent = cfg.quantum + ' ms'; };
+// browsers keep slider positions across a reload, so apply them right away
+['speedSlider', 'rateSlider', 'quantumSlider'].forEach(id => { const el = $(id); if (el) el.oninput({ target: el }); });
 if ($('hiBtn')) $('hiBtn').onclick = () => { spawn(+S.t.toFixed(2), randBurst(), 1, -5); S.animUntil = performance.now() + 700; renderTable(); };
 if ($('loBtn')) $('loBtn').onclick = () => { spawn(+S.t.toFixed(2), randBurst(), 4, 5); S.animUntil = performance.now() + 700; renderTable(); };
 if ($('agingBtn')) $('agingBtn').onclick = () => { aging = !aging; $('agingBtn').textContent = 'Aging: ' + (aging ? 'on' : 'off'); $('agingBtn').classList.toggle('primary', aging); };
@@ -1040,12 +1219,165 @@ function step(dt, now){
   if (!paused && now - lastTable > 120){ renderTable(); lastTable = now; }
 }
 resetSim(); renderTable();
-return { step, draw, togglePause };
+// used by the comparison slide: run this simulation while its own slide is not visible, and read its numbers
+function advance(ms){
+  simAdvance(ms);
+  S.vis = S.vis.filter(p => p.state !== 'done');   // nothing animates them off-screen; don't let them pile up
+  S.dirty = true;
+}
+function stats(){
+  return { t:S.t, completed:S.completed, switches:S.switches, gantt:S.gantt,
+           wait:S.completed ? S.sumWait / S.completed : null, turn:S.completed ? S.sumTurn / S.completed : null,
+           overhead:S.t > 0 ? 100 * S.csTime / S.t : 0 };
+}
+return { step, draw, togglePause, advance, stats, renderTable };
 }
 const sims = { fcfs: createSim('', 'fcfs'), sjf: createSim('J', 'sjf'), prio: createSim('P', 'prio'), rr: createSim('R', 'rr'), cfs: createSim('C', 'cfs') };
 
+/* ================= CHARACTERISTICS ================= */
+// Shown as the characteristics matrix on the comparison slide.
+// Each value: [text, rating (1 good, 0 neutral, -1 bad), optional note]
+const TRAITS = [
+  { name:'Preemptive', v:{
+    fcfs:['No', 0, 'A process keeps the CPU until it finishes or blocks.'],
+    sjf: ['No', 0, 'The preemptive version is called SRTF.'],
+    prio:['No', 0, 'Preemptive versions also exist.'],
+    rr:  ['Yes, by quantum', 0, 'A timer interrupt ends every turn.'],
+    cfs: ['Yes', 0, 'Slices end, and a waiting process with a smaller vruntime takes over.'] } },
+  { name:'Starvation', v:{
+    fcfs:['No', 1, 'Everyone is served in turn.'],
+    sjf: ['Yes, long jobs', -1, 'Short jobs can keep jumping ahead of them.'],
+    prio:['Yes, low priority', -1, 'Aging fixes it by raising the priority over time.'],
+    rr:  ['No', 1, 'Everyone gets a turn every round.'],
+    cfs: ['No', 1, 'The smallest vruntime always gets the CPU next.'] } },
+  { name:'Responsiveness', v:{
+    fcfs:['Poor', -1, 'One long job blocks everyone behind it (convoy effect).'],
+    sjf: ['Good for short jobs', 0, 'Long jobs may wait a long time.'],
+    prio:['Good for high priority', 0, 'Low priority may wait a long time.'],
+    rr:  ['Good', 1, 'Every process runs again within one round.'],
+    cfs: ['Good', 1, 'Designed for interactive desktops.'] } },
+  { name:'Average waiting', v:{
+    fcfs:['Medium', 0, 'Grows when long jobs come first.'],
+    sjf: ['Lowest', 1, 'Provably optimal among non-preemptive schedulers.'],
+    prio:['Medium', 0, 'Depends on how priorities relate to burst times.'],
+    rr:  ['Higher', -1, 'Jobs of similar length all finish late.'],
+    cfs: ['Higher', -1, 'Sharing the CPU delays everyone a little.'] } },
+  { name:'Switch overhead', v:{
+    fcfs:['Low', 1, 'One context switch per process.'],
+    sjf: ['Low', 1, 'One context switch per process.'],
+    prio:['Low', 1, 'One context switch per process.'],
+    rr:  ['Higher', -1, 'The smaller the quantum, the more switches.'],
+    cfs: ['Higher', -1, 'Slices shrink when many processes are ready.'] } },
+  { name:'Fairness', v:{
+    fcfs:['By arrival order', 0],
+    sjf: ['Unfair to long jobs', -1],
+    prio:['Unfair by design', 0, 'Important work is meant to go first.'],
+    rr:  ['Equal turns', 1],
+    cfs: ['Weighted fair share', 1, 'CPU share follows the nice value.'] } },
+  { name:'Needs to know', v:{
+    fcfs:['Nothing', 1],
+    sjf: ['Burst times', -1, 'Unknown in advance, so real systems have to predict them.'],
+    prio:['Priorities', 0],
+    rr:  ['A good quantum', 0, 'Too small: lots of overhead. Too large: it behaves like FCFS.'],
+    cfs: ['Nice values', 0] } },
+];
+const RATE_CLS = { '1':'good', '0':'mid', '-1':'bad' };
+{
+  const ALGS = [['fcfs','FCFS'], ['sjf','SJF'], ['prio','Priority'], ['rr','Round Robin'], ['cfs','CFS']];
+  const el = document.getElementById('cmpTraits');
+  el.style.gridTemplateColumns = `110px repeat(${TRAITS.length}, minmax(96px, 1fr))`;
+  el.innerHTML = '<div class="h"></div>' + TRAITS.map(t => `<div class="h">${t.name}</div>`).join('') +
+    ALGS.map(([k, n]) => `<div class="name">${n}</div>` + TRAITS.map(t => { const [txt, r, note] = t.v[k];
+      return `<div class="c ${RATE_CLS[r]}"${note ? ` title="${note}"` : ''}>${txt}</div>`; }).join('')).join('');
+}
+
+/* ================= COMPARISON SLIDE ================= */
+// Every simulation keeps its own state; this slide only reads them and, while playing, runs them all together.
+const CMP = [
+  { key:'fcfs', name:'FCFS' }, { key:'sjf', name:'SJF' }, { key:'prio', name:'Priority' },
+  { key:'rr', name:'Round Robin' }, { key:'cfs', name:'CFS' },
+];
+const CMP_COLS = [   // [label, stat, format, lower is better?]
+  ['Sim time', 't', v => Math.round(v) + ' ms', null],
+  ['Avg waiting', 'wait', v => v.toFixed(1) + ' ms', true],
+  ['Avg turnaround', 'turn', v => v.toFixed(1) + ' ms', true],
+  ['Completed', 'completed', v => v, null],
+  ['Context switches', 'switches', v => v, true],
+  ['Overhead', 'overhead', v => v.toFixed(1) + '%', true],
+];
+const cmpEl = document.getElementById('cmp');
+let cmpPlaying = false, cmpSpeed = 2, cmpLastTable = 0;
+cmpEl.innerHTML = '<div class="h">Scheduler</div><div class="h">CPU timeline (last 40 ms)</div>' +
+  CMP_COLS.map(c => `<div class="h num">${c[0]}</div>`).join('') +
+  CMP.map(r => `<div class="name">${r.name}</div><div class="tlc"><canvas data-k="${r.key}"></canvas></div>` +
+    CMP_COLS.map(c => `<div class="num v" data-k="${r.key}" data-s="${c[1]}"></div>`).join('')).join('');
+
+function drawMiniGantt(cv, st){
+  const f = fitCanvas(cv); if (!f) return;
+  const { ctx, W, H } = f, win = 40, tEnd = Math.max(st.t, win), tStart = tEnd - win;
+  const X = t => (t - tStart) / win * W;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#e5e5e2'; rr(ctx, 0.5, 0.5, W - 1, H - 1, 5); ctx.fill(); ctx.stroke();
+  ctx.save(); rr(ctx, 0.5, 0.5, W - 1, H - 1, 5); ctx.clip();
+  ctx.font = '700 10px "JetBrains Mono", monospace'; ctx.textAlign = 'center';
+  st.gantt.forEach(g => {
+    if (g.e < tStart) return;
+    const a = X(Math.max(g.s, tStart)), w = X(g.e) - a;
+    if (g.cs){ ctx.fillStyle = 'rgba(217,60,60,.85)'; ctx.fillRect(a, 0, Math.max(w, 1.5), H); return; }
+    ctx.fillStyle = g.color; ctx.fillRect(a, 1, Math.max(w - 1, 0.5), H - 2);
+    if (w > 34){ ctx.fillStyle = '#fff'; let t = g.name; while (t.length > 1 && ctx.measureText(t).width > w - 6) t = t.slice(0, -1);
+      ctx.fillText(t, a + w / 2, H / 2 + 4); }
+  });
+  ctx.restore();
+}
+function renderCompare(){
+  const all = CMP.map(r => ({ k:r.key, s:sims[r.key].stats() }));
+  CMP_COLS.forEach(([, s, fmt, lower]) => {
+    const vals = all.map(a => a.s[s]).filter(v => v !== null);
+    const best = lower === null || !vals.length ? null : (lower ? Math.min(...vals) : Math.max(...vals));
+    const worst = lower === null || !vals.length ? null : (lower ? Math.max(...vals) : Math.min(...vals));
+    all.forEach(a => {
+      const el = cmpEl.querySelector(`.v[data-k="${a.k}"][data-s="${s}"]`), v = a.s[s];
+      el.textContent = v === null ? '-' : fmt(v);
+      // compare the numbers as shown, so equal-looking values are highlighted together
+      const shown = v === null ? null : fmt(v), differ = best !== null && fmt(best) !== fmt(worst);
+      el.classList.toggle('best', differ && shown === fmt(best));
+      el.classList.toggle('worst', differ && shown === fmt(worst));
+    });
+  });
+  const ts = all.map(a => a.s.t), spread = Math.max(...ts) - Math.min(...ts);
+  document.getElementById('cmpNote').textContent = spread < 0.5
+    ? 'All simulations are at the same time, so they have seen exactly the same processes.'
+    : `The simulations are up to ${Math.round(spread)} ms apart. Press "Align times" for a fair comparison.`;
+}
+function drawCompare(){
+  cmpEl.querySelectorAll('canvas').forEach(cv => drawMiniGantt(cv, sims[cv.dataset.k].stats()));
+  renderCompare();
+}
+function toggleCompare(){
+  cmpPlaying = !cmpPlaying;
+  const b = document.getElementById('cmpPlay');
+  b.textContent = cmpPlaying ? 'Pause all' : 'Play all';
+}
+document.getElementById('cmpPlay').onclick = toggleCompare;
+document.getElementById('cmpAlign').onclick = () => {   // run the ones behind until they catch up; nothing is reset
+  const tMax = Math.max(...CMP.map(r => sims[r.key].stats().t));
+  CMP.forEach(r => { const s = sims[r.key], gap = tMax - s.stats().t; if (gap > 0) s.advance(gap); s.renderTable(); });
+  drawCompare();
+};
+document.getElementById('cmpSpeed').oninput = e => {
+  const m = 2 ** +e.target.value; cmpSpeed = 2 * m;
+  document.getElementById('cmpSpeedVal').textContent = (m < 1 ? m.toFixed(2) : m < 10 ? +m.toFixed(1) : Math.round(m)) + '×';
+};
+document.getElementById('cmpSpeed').oninput({ target: document.getElementById('cmpSpeed') });
+function compareStep(dt, now){
+  if (cmpPlaying) CMP.forEach(r => sims[r.key].advance(dt * cmpSpeed));
+  cmpEl.querySelectorAll('canvas').forEach(cv => drawMiniGantt(cv, sims[cv.dataset.k].stats()));
+  if (now - cmpLastTable > 120){ renderCompare(); cmpLastTable = now; }
+}
+
 /* ================= MAIN LOOP ================= */
-function resizeAll(){ if (sims[names[cur]]) sims[names[cur]].draw(); if (names[cur] === 'sjf-info') drawCheckout(); if (names[cur] === 'prio-info') drawER(); if (names[cur] === 'rr-info') drawRR(); if (names[cur] === 'cfs-info') drawCFS(); if (names[cur] === 'intro') drawTimeline(.06); if (names[cur] === 'fcfs-info') drawPaper(); }
+function resizeAll(){ if (names[cur] === 'compare') drawCompare(); if (names[cur] === 'context-switch') swDrawTimeline(); if (sims[names[cur]]) sims[names[cur]].draw(); if (names[cur] === 'sjf-info') drawCheckout(); if (names[cur] === 'prio-info') drawER(); if (names[cur] === 'rr-info') drawRR(); if (names[cur] === 'cfs-info') drawCFS(); if (names[cur] === 'intro') drawTimeline(.06); if (names[cur] === 'fcfs-info') drawPaper(); }
 window.addEventListener('resize', resizeAll);
 
 let last = performance.now();
@@ -1056,6 +1388,8 @@ function frame(now){
   if (name === 'lifecycle') lifeStep(dt); else life.active = false;
   if (name === 'fcfs-info') paperStep(dt);
   if (sims[name]) sims[name].step(dt, now);
+  if (name === 'compare') compareStep(dt, now);
+  if (name === 'context-switch') swStep(dt);
   if (name === 'sjf-info') checkoutStep(dt);
   if (name === 'prio-info') erStep(dt);
   if (name === 'rr-info') rrStep(dt);

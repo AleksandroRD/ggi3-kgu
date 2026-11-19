@@ -100,6 +100,7 @@ function showViewer(t) {
   document.title = t.title;
   document.body.classList.add('open');
   viewer.classList.add('show');
+  viewerReady.then(() => { try { frame.focus(); } catch (e) {} });   // so the arrow keys reach the slides
 }
 
 /* ---------- the 3D book (built once per hover, destroyed after use) ---------- */
@@ -301,7 +302,16 @@ function finishClose(btn) {
 
 /* ---------- controls ---------- */
 $('back').addEventListener('click', closeBook);
-addEventListener('keydown', e => { if (e.key === 'Escape') closeBook(); });
+const NAV_KEYS = ['ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', ' '];
+addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeBook(); return; }
+  // after a reload the focus is here, not in the presentation frame, so pass navigation keys on
+  if (current && !busy && NAV_KEYS.includes(e.key)) {
+    e.preventDefault();
+    frame.contentWindow.postMessage({ type: 'key', key: e.key }, '*');
+    try { frame.focus(); } catch (err) {}   // later keys then go straight to the frame
+  }
+});
 addEventListener('message', e => {
   if (e.source !== frame.contentWindow) return;
   if (e.data === 'close-book') closeBook();

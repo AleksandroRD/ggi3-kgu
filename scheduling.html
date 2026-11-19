@@ -100,6 +100,7 @@
         <div class="metrics m1">
           <div class="metric card"><h4>Arrival time</h4><p>When the process enters the ready queue.</p><span class="goal">input</span></div>
           <div class="metric card"><h4>Burst time</h4><p>How much CPU time the process needs to finish.</p><span class="goal">input</span></div>
+          <div class="metric card"><h4>Completion time</h4><p>The moment the process finishes its last burst.</p><span class="goal">input</span></div>
         </div>
       </div>
       <div class="mright">
@@ -113,10 +114,56 @@
         <div class="metrics m3">
           <div class="metric card"><h4>Throughput</h4><p>How many processes finish per unit of time.</p><code>completed ÷ time</code><span class="goal up">higher is better</span></div>
           <div class="metric card"><h4>CPU utilization</h4><p>Share of time the CPU does useful work.</p><code>busy time ÷ total time</code><span class="goal up">higher is better</span></div>
-          <div class="metric card cs"><h4>Context switch</h4><p>Saving one process's state and loading the next one's. Pure overhead: no useful work happens during it.</p><span class="goal down">lower is better</span></div>
+          <div class="metric card cs"><h4>Overhead</h4><p>Share of time the CPU spends on context switches instead of running processes.</p><code>switch time ÷ total time</code><span class="goal down">lower is better</span></div>
         </div>
       </div>
     </div>
+  </section>
+
+  <!-- ============ SLIDE: CONTEXT SWITCH (live, instruction by instruction) ============ -->
+  <section class="slide" data-name="context-switch">
+    <h2>What is a context switch?</h2>
+    <p class="lead muted" style="margin:0 0 12px">Handing the CPU to another process means putting one process's work away and picking up another's. Here it is in slow motion.</p>
+    <div class="card sw-top">
+      <canvas id="swTl"></canvas>
+      <div class="sw-foot">
+        <div class="sw-legend"><i></i>context switch: the CPU is busy, but no process makes progress</div>
+        <div class="sw-ctl">
+          <button class="btn primary" id="swPlay" style="min-width:92px">Pause</button>
+          <div class="ctl" style="min-width:150px"><label>Speed <b id="swSpeedVal">1×</b></label><input type="range" id="swSpeed" min="-2" max="2" step="0.25" value="0"></div>
+        </div>
+      </div>
+    </div>
+    <div class="sw-grid">
+      <div class="card sw-steps">
+        <h4>What happens during a switch</h4>
+        <ol class="steps" id="swSteps"></ol>
+        <div class="sw-status" id="swStatus"></div>
+      </div>
+      <div class="card sw-code">
+        <div class="sw-code-h">switch_to <span>simplified x86-64</span></div>
+        <div id="swCode"></div>
+      </div>
+      <div class="card sw-state">
+        <h4>CPU registers <span>coloured by owner</span></h4>
+        <div class="regs" id="swRegs"></div>
+        <h4>Kernel stack of each process</h4>
+        <div class="stacks" id="swStacks"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SLIDE: WHY CONTEXT SWITCHES MATTER ============ -->
+  <section class="slide" data-name="switch-cost">
+    <h2>Why context switches matter</h2>
+    <p class="lead muted" style="margin:0 0 18px">A switch is necessary to share the CPU, but it is never free.</p>
+    <div class="why-grid">
+      <div class="card"><h4>Pure overhead</h4><p>No process makes progress during a switch. The CPU is busy, but no useful work gets done.</p></div>
+      <div class="card"><h4>Small but frequent</h4><p>A single switch takes about a <b>microsecond</b>, but it can happen <b>thousands of times per second</b>.</p></div>
+      <div class="card"><h4>Hidden costs</h4><p>Caches and the TLB still hold the previous process's data, so the new process <b>starts out slow</b>.</p></div>
+      <div class="card"><h4>A trade-off</h4><p>Switching often makes the system feel <b>responsive</b>, but loses more CPU time. This trade-off comes up with every algorithm that follows.</p></div>
+    </div>
+    <p class="why-foot">The simulations measure this cost as <b>Overhead</b>: <code>switch time ÷ total time</code>.</p>
   </section>
 
   <!-- ============ SLIDE: FCFS OVERVIEW ============ -->
@@ -154,7 +201,8 @@
         <button class="btn primary" id="playBtn" style="min-width:92px">Pause</button>
         <button class="btn" id="resetBtn">Reset</button>
         <button class="btn" id="longBtn" title="Adds a process with burst 18">+ Long process</button>
-        <div class="ctl" style="min-width:200px"><label>Arrival speed <b id="rateVal">1.0×</b></label><input type="range" id="rateSlider" min="0.2" max="3" step="0.1" value="1"></div>
+        <div class="ctl" style="min-width:170px"><label>Simulation speed <b id="speedVal">1×</b></label><input type="range" id="speedSlider" min="-2" max="5" step="0.25" value="0" title="0.25× to 32×"></div>
+        <div class="ctl" style="min-width:170px"><label>Workload <b id="rateVal">1.0×</b></label><input type="range" id="rateSlider" min="0.2" max="3" step="0.1" value="1"></div>
       </div>
       <div class="stats">
         <div class="stat card"><div class="k">Avg waiting</div><div class="v" id="mW">-</div></div>
@@ -226,7 +274,8 @@
         <button class="btn" id="resetBtnJ">Reset</button>
         <button class="btn" id="shortBtnJ" title="Adds a process with burst 1-2">+ Short process</button>
         <button class="btn" id="longBtnJ" title="Adds a process with burst 18">+ Long process</button>
-        <div class="ctl" style="min-width:200px"><label>Arrival speed <b id="rateValJ">1.0×</b></label><input type="range" id="rateSliderJ" min="0.2" max="3" step="0.1" value="1"></div>
+        <div class="ctl" style="min-width:170px"><label>Simulation speed <b id="speedValJ">1×</b></label><input type="range" id="speedSliderJ" min="-2" max="5" step="0.25" value="0" title="0.25× to 32×"></div>
+        <div class="ctl" style="min-width:170px"><label>Workload <b id="rateValJ">1.0×</b></label><input type="range" id="rateSliderJ" min="0.2" max="3" step="0.1" value="1"></div>
       </div>
       <div class="stats">
         <div class="stat card"><div class="k">Avg waiting</div><div class="v" id="mWJ">-</div></div>
@@ -299,7 +348,8 @@
         <button class="btn" id="hiBtnP" title="Adds a priority-1 process">+ High priority</button>
         <button class="btn" id="loBtnP" title="Adds a priority-4 process">+ Low priority</button>
         <button class="btn" id="agingBtnP" title="Waiting processes slowly gain priority">Aging: off</button>
-        <div class="ctl" style="min-width:200px"><label>Arrival speed <b id="rateValP">1.0×</b></label><input type="range" id="rateSliderP" min="0.2" max="3" step="0.1" value="1"></div>
+        <div class="ctl" style="min-width:170px"><label>Simulation speed <b id="speedValP">1×</b></label><input type="range" id="speedSliderP" min="-2" max="5" step="0.25" value="0" title="0.25× to 32×"></div>
+        <div class="ctl" style="min-width:170px"><label>Workload <b id="rateValP">1.0×</b></label><input type="range" id="rateSliderP" min="0.2" max="3" step="0.1" value="1"></div>
       </div>
       <div class="stats">
         <div class="stat card"><div class="k">Avg waiting</div><div class="v" id="mWP">-</div></div>
@@ -370,7 +420,8 @@
         <button class="btn" id="resetBtnR">Reset</button>
         <button class="btn" id="longBtnR" title="Adds a process with burst 18">+ Long process</button>
         <div class="ctl" style="min-width:200px"><label>Time quantum <b id="quantumValR">4 ms</b></label><input type="range" id="quantumSliderR" min="1" max="10" step="1" value="4"></div>
-        <div class="ctl" style="min-width:200px"><label>Arrival speed <b id="rateValR">1.0×</b></label><input type="range" id="rateSliderR" min="0.2" max="3" step="0.1" value="1"></div>
+        <div class="ctl" style="min-width:170px"><label>Simulation speed <b id="speedValR">1×</b></label><input type="range" id="speedSliderR" min="-2" max="5" step="0.25" value="0" title="0.25× to 32×"></div>
+        <div class="ctl" style="min-width:170px"><label>Workload <b id="rateValR">1.0×</b></label><input type="range" id="rateSliderR" min="0.2" max="3" step="0.1" value="1"></div>
       </div>
       <div class="stats">
         <div class="stat card"><div class="k">Avg waiting</div><div class="v" id="mWR">-</div></div>
@@ -441,7 +492,8 @@
         <button class="btn" id="resetBtnC">Reset</button>
         <button class="btn" id="hiBtnC" title="Adds a process with nice -5 (high weight)">+ High weight (nice −5)</button>
         <button class="btn" id="loBtnC" title="Adds a process with nice +5 (low weight)">+ Low weight (nice +5)</button>
-        <div class="ctl" style="min-width:200px"><label>Arrival speed <b id="rateValC">1.0×</b></label><input type="range" id="rateSliderC" min="0.2" max="3" step="0.1" value="1"></div>
+        <div class="ctl" style="min-width:170px"><label>Simulation speed <b id="speedValC">1×</b></label><input type="range" id="speedSliderC" min="-2" max="5" step="0.25" value="0" title="0.25× to 32×"></div>
+        <div class="ctl" style="min-width:170px"><label>Workload <b id="rateValC">1.0×</b></label><input type="range" id="rateSliderC" min="0.2" max="3" step="0.1" value="1"></div>
       </div>
       <div class="stats">
         <div class="stat card"><div class="k">Avg waiting</div><div class="v" id="mWC">-</div></div>
@@ -476,14 +528,29 @@
       </div>
     </div>
   </section>
+
+  <!-- ============ SLIDE: COMPARISON ============ -->
+  <section class="slide" data-name="compare">
+    <h2>All schedulers side by side</h2>
+    <p class="lead muted" style="margin:0 0 12px">The live simulations from the previous slides, all receiving exactly the same processes.</p>
+    <div class="cmp card" id="cmp"></div>
+    <div class="controls" style="justify-content:flex-start;margin-top:10px">
+      <button class="btn primary" id="cmpPlay" style="min-width:110px">Play all</button>
+      <button class="btn" id="cmpAlign" title="Runs the simulations that are behind until all reach the same time. Nothing is reset.">Align times</button>
+      <div class="ctl" style="min-width:170px"><label>Simulation speed <b id="cmpSpeedVal">1×</b></label><input type="range" id="cmpSpeed" min="-2" max="5" step="0.25" value="0" title="0.25× to 32×"></div>
+      <span class="muted cmp-note" id="cmpNote"></span>
+    </div>
+    <h5 class="mgroup" style="margin:14px 0 8px">Characteristics</h5>
+    <div class="cmp-traits card" id="cmpTraits"></div>
+  </section>
 </main>
 
 <nav class="nav">
   <button class="btn" id="prev">← Prev</button>
   <div class="dots" id="dots"></div>
   <button class="btn" id="next">Next →</button>
-  <span class="hint">← → to navigate · space = pause</span>
 </nav>
+<span class="hint">← → to navigate · space = pause</span>
 
 <script src="scheduling.js"></script>
 </body>
